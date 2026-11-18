@@ -1,41 +1,60 @@
-// A working best-game-01 entry (Node 22, standard library only): the game is this directory's
-// game/ folder, plain static files a desktop browser loads offline (game/index.html and its ES
-// modules, no library and no network request), and the program hands it in. It copies game/ and
-// screenshots/ from beside this file to /output and writes /output/dossier.json, the summary the
-// judge reads, with the vendored make.fun library. A starting point, not a winner: Block Dodger, a
-// plain 2D canvas game where a paddle dodges falling blocks and catches coins, with a title screen,
-// score, lives and levels, game over and restart, flat colours and no sound. Build your own game
-// (any genre, any library you vendor under game/, or none), put your 3 or 4 PNG or JPEG screenshots
-// in screenshots/ (the first by name is the cover) and run it.
-//
-// Serve it locally with `node serve.ts`, then open http://localhost:8080.
-// Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
-//   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
-
 import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-game.ts';
 
-const here = fileURLToPath(new URL('.', import.meta.url));
-const out = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
+/**
+ * Build and package the game entry for the make.fun grader.
+ *
+ * This script mirrors the starter's runtime behavior:
+ * - copies `game/` and `screenshots/` from this repository into the output directory
+ * - generates `dossier.json` with the same validation caps expected by the scorer
+ *
+ * Output location defaults to `/output`, but can be overridden with MAKEFUN_OUTPUT_DIR
+ * for local verification (e.g. MAKEFUN_OUTPUT_DIR=out).
+ */
 
-mkdirSync(out, { recursive: true });
-cpSync(join(here, 'game'), join(out, 'game'), { recursive: true });
-mkdirSync(join(out, 'screenshots'), { recursive: true });
-if (existsSync(join(here, 'screenshots'))) cpSync(join(here, 'screenshots'), join(out, 'screenshots'), { recursive: true });
+const SOURCE_ROOT = dirname(fileURLToPath(import.meta.url));
+const OUTPUT_ROOT = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 
-// The scorer's own caps (reference/gate.json): only text_max_bytes shapes the bytes; the others refuse an entry the
-// scorer would refuse (more than 4 screenshots or one over 256 KiB; more than 993 files in game/ or 48 MiB of game
-// files, in all, or a path under game/ over 1000 bytes: game/ counts beside /output's own 1000-entry cap, its
-// screenshots/ and dossier.json).
-writeFileSync(
-  join(out, 'dossier.json'),
-  buildDossier(out, {
-    text_max_bytes: 163840,
-    screenshots: { max: 4, max_bytes: 262144 },
-    game_max_files: 993,
-    game_max_bytes: 50331648,
-    game_path_max_bytes: 1000,
-  }),
-);
+const GAME_SOURCE_DIR = join(SOURCE_ROOT, 'game');
+const SCREENSHOTS_SOURCE_DIR = join(SOURCE_ROOT, 'screenshots');
+
+const GAME_OUTPUT_DIR = join(OUTPUT_ROOT, 'game');
+const SCREENSHOTS_OUTPUT_DIR = join(OUTPUT_ROOT, 'screenshots');
+const DOSSIER_OUTPUT_PATH = join(OUTPUT_ROOT, 'dossier.json');
+
+const DOSSIER_CAPS = {
+  text_max_bytes: 163840,
+  screenshots: { max: 4, max_bytes: 262144 },
+  game_max_files: 993,
+  game_max_bytes: 50331648,
+  game_path_max_bytes: 1000,
+} as const;
+
+function ensureDirectory(path: string): void {
+  mkdirSync(path, { recursive: true });
+}
+
+function copyGameAssets(): void {
+  ensureDirectory(OUTPUT_ROOT);
+  cpSync(GAME_SOURCE_DIR, GAME_OUTPUT_DIR, { recursive: true });
+
+  // Always create the screenshots output directory; copy source screenshots when present.
+  ensureDirectory(SCREENSHOTS_OUTPUT_DIR);
+  if (existsSync(SCREENSHOTS_SOURCE_DIR)) {
+    cpSync(SCREENSHOTS_SOURCE_DIR, SCREENSHOTS_OUTPUT_DIR, { recursive: true });
+  }
+}
+
+function writeDossier(): void {
+  const dossierJson = buildDossier(OUTPUT_ROOT, DOSSIER_CAPS);
+  writeFileSync(DOSSIER_OUTPUT_PATH, dossierJson);
+}
+
+function main(): void {
+  copyGameAssets();
+  writeDossier();
+}
+
+main();
