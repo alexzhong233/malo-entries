@@ -7,6 +7,10 @@ combines the empirical distribution of those log ratios with a robust normal
 approximation. Blending the two keeps the tails sensible when only a handful of
 comparables survive the filters.
 
+When an hour has no comparable data, the last observed hour's quantiles are
+carried forward, decayed by 2% per carried hour (compounding), reflecting the
+assumption that an unsampled audience keeps fading.
+
 Inputs are JSON case files in MAKEFUN_INPUT_DIR (default /input); one compact
 JSON output is written per case into MAKEFUN_OUTPUT_DIR (default /output).
 """
@@ -21,6 +25,8 @@ from pathlib import Path
 TAUS = (0.05, 0.25, 0.5, 0.75, 0.95)
 ZS = (-1.645, -0.674, 0.0, 0.674, 1.645)
 HOURS = tuple(range(2, 25))
+# Unsampled hours keep fading: the carried quantiles shrink 2% per hour.
+CARRY_DECAY = 0.98
 
 # The input text is lowercased before matching, so the marker is lowercase too.
 TIER_RE = re.compile(r"tier:\s*([a-z-]+)")
@@ -102,12 +108,30 @@ def quantile_at(sorted_values, position):
     return sorted_values[low] + frac * (sorted_values[high] - sorted_values[low])
 
 
-def forecast_row(hour, p1, pool, last_good=None):
+def carry_row(hour, reference_q, carried_hours):
+    """Carry a row forward, shrinking it 2% per carried hour (compounded).
+
+    The same factor is applied to every quantile, so the spread narrows but the
+    ordering is preserved. Clamping and rounding are monotone, and the running
+    max guards the required non-decreasing order defensively.
+    """
+    factor = CARRY_DECAY ** carried_hours
+    quantiles = []
+    for q in reference_q:
+        value = min(max(q * factor, 0.01), 1e9)
+        value = max(value, quantiles[-1]) if quantiles else value
+        quantiles.append(round(value, 2))
+    return {"hour": hour, "q": quantiles}
+
+
+def forecast_row(hour, p1, pool, last_good=None, carried_hours=1):
     """Build one output row from the surviving comparable ratio curves.
 
-    `last_good` carries the previous hour's (logs, quantiles) so a gap in the
+    `last_good` carries the last observed hour's quantiles so a gap in the
     source data (e.g. the day's last sample) extrapolates from the nearest
-    observed hour instead of collapsing to flat persistence.
+    observed hour instead of collapsing to flat persistence. `carried_hours`
+    is how many hours (including this one) have been carried since the last
+    observation, and determines the compounding decay.
     """
     logs = []
     for _, ratios in pool:
@@ -118,7 +142,7 @@ def forecast_row(hour, p1, pool, last_good=None):
 
     if not logs:
         if last_good is not None:
-            return {"hour": hour, "q": list(last_good[1]["q"])}, None
+            return carry_row(hour, last_good[1]["q"], carried_hours), None
         return {"hour": hour, "q": [round(p1, 2)] * 5}, None
 
     n = len(logs)
@@ -157,11 +181,18 @@ def solve_case(data):
     pool.sort(key=lambda item: item[0])
 
     rows, carried = [], None
+    carried_hours = 0
     for h in HOURS:
-        row, logs = forecast_row(h, p1, pool, last_good=carried)
+        row, logs = forecast_row(
+            h, p1, pool, last_good=carried, carried_hours=carried_hours + 1
+        )
         rows.append(row)
         if logs:
             carried = (logs, {"hour": h, "q": list(row["q"])})
+            carried_hours = 0
+        elif carried is not None:
+            # This hour was carried; the next gap hour decays one step further.
+            carried_hours += 1
     return {"hours": rows}
 
 
