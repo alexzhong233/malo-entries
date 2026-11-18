@@ -1,60 +1,104 @@
-import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { buildDossier } from './vendor/makefun-game.ts';
+// The entry <-> env lifecycle, as env/src/wire.ts settles it: bind an ephemeral port, tell the env the
+// port it bound, then poll until the env says the trial is over and exit 0. Keep this file as it is:
+// the suite scores the server app.ts builds, and the lifecycle is the harness's, not the contest's.
+//
+//   1. MAKEFUN_ENV_URL names the env's origin (http://store:8080 in a trial container). Without it
+//      there is nothing to talk to, so the program exits 1 at once.
+//   2. Create the server and listen(0): the kernel picks a free port. Never bind 8080 — the env owns it.
+//   3. POST $MAKEFUN_ENV_URL/register {"port": N}. The env records the address the request came from
+//      plus N as your base URL and dials it from then on. The first register wins; a 409 means another
+//      entry already registered, and this process keeps waiting like any other.
+//   4. GET $MAKEFUN_ENV_URL/done until the body is {"done": true}. The env answers at once ({"done":
+//      false} while the suite runs), so this is a poll, not a long-held request. A failed or slow poll
+//      is retried with a short exponential backoff; the process never exits before the env says done.
+//   5. Close the server and exit 0. The harness then stops the env, which writes the export the scorer
+//      reads.
+//
+// main.ts imports its own server and nothing else: no package, no Node built-in, no model call.
 
-/**
- * Build and package the game entry for the make.fun grader.
- *
- * This script mirrors the starter's runtime behavior:
- * - copies `game/` and `screenshots/` from this repository into the output directory
- * - generates `dossier.json` with the same validation caps expected by the scorer
- *
- * Output location defaults to `/output`, but can be overridden with MAKEFUN_OUTPUT_DIR
- * for local verification (e.g. MAKEFUN_OUTPUT_DIR=out).
- */
+import { createApp } from './app.ts';
 
-const SOURCE_ROOT = dirname(fileURLToPath(import.meta.url));
-const OUTPUT_ROOT = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
-
-const GAME_SOURCE_DIR = join(SOURCE_ROOT, 'game');
-const SCREENSHOTS_SOURCE_DIR = join(SOURCE_ROOT, 'screenshots');
-
-const GAME_OUTPUT_DIR = join(OUTPUT_ROOT, 'game');
-const SCREENSHOTS_OUTPUT_DIR = join(OUTPUT_ROOT, 'screenshots');
-const DOSSIER_OUTPUT_PATH = join(OUTPUT_ROOT, 'dossier.json');
-
-const DOSSIER_CAPS = {
-  text_max_bytes: 163840,
-  screenshots: { max: 4, max_bytes: 262144 },
-  game_max_files: 993,
-  game_max_bytes: 50331648,
-  game_path_max_bytes: 1000,
-} as const;
-
-function ensureDirectory(path: string): void {
-  mkdirSync(path, { recursive: true });
+const ENV_URL = (process.env.MAKEFUN_ENV_URL ?? '').replace(/\/+$/, '');
+if (ENV_URL === '') {
+  process.stderr.write('[entry] MAKEFUN_ENV_URL is not set: there is no env to register with\n');
+  process.exit(1);
 }
 
-function copyGameAssets(): void {
-  ensureDirectory(OUTPUT_ROOT);
-  cpSync(GAME_SOURCE_DIR, GAME_OUTPUT_DIR, { recursive: true });
+/** How long one register or done request may take before it is abandoned and retried. */
+const REQUEST_TIMEOUT_MS = 30_000;
+/** The first wait between retries, and the longest. */
+const RETRY_INITIAL_MS = 250;
+const RETRY_MAX_MS = 2_000;
 
-  // Always create the screenshots output directory; copy source screenshots when present.
-  ensureDirectory(SCREENSHOTS_OUTPUT_DIR);
-  if (existsSync(SCREENSHOTS_SOURCE_DIR)) {
-    cpSync(SCREENSHOTS_SOURCE_DIR, SCREENSHOTS_OUTPUT_DIR, { recursive: true });
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** The wait after `attempt` failed requests: exponential from RETRY_INITIAL_MS, capped. */
+function retryDelay(attempt: number): number {
+  return Math.min(RETRY_MAX_MS, RETRY_INITIAL_MS * 2 ** Math.min(attempt, 8));
+}
+
+/**
+ * POST the bound port until the env accepts it. 200 is the normal answer; 409 means a first register
+ * already won, which is not this process's to fix. 400 and 405 are contract errors and end the program;
+ * a network error or another status is retried, since the env may still be starting.
+ */
+async function register(port: number): Promise<void> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const res = await fetch(`${ENV_URL}/register`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ port }),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+      if (res.status === 200 || res.status === 409) return;
+      if (res.status === 400 || res.status === 405) throw new Error(`register answered HTTP ${res.status}: ${await res.text()}`);
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('register answered HTTP ')) throw err;
+    }
+    await sleep(retryDelay(attempt));
   }
 }
 
-function writeDossier(): void {
-  const dossierJson = buildDossier(OUTPUT_ROOT, DOSSIER_CAPS);
-  writeFileSync(DOSSIER_OUTPUT_PATH, dossierJson);
+/** Poll GET /done until it answers {"done":true}; never return before that. */
+async function waitForDone(): Promise<void> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const res = await fetch(`${ENV_URL}/done`, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+      if (res.ok) {
+        const body = (await res.json()) as { done?: unknown };
+        if (body.done === true) return;
+      }
+    } catch {
+      // The env is not answering yet, or the poll timed out: it is not done, so poll again.
+    }
+    await sleep(retryDelay(attempt));
+  }
 }
 
-function main(): void {
-  copyGameAssets();
-  writeDossier();
+/** Bound the port, register it, then wait for the env: the whole life of the process. */
+async function main(): Promise<void> {
+  const server = createApp();
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, () => resolve());
+  });
+  const address = server.address();
+  if (address === null || typeof address === 'string') throw new Error('the server did not bind an ephemeral TCP port');
+  process.stdout.write(`[entry] listening on port ${address.port}\n`);
+
+  await register(address.port);
+  process.stdout.write('[entry] registered; waiting for the env to say done\n');
+
+  await waitForDone();
+  server.close();
+  process.stdout.write('[entry] done\n');
 }
 
-main();
+try {
+  await main();
+  process.exit(0);
+} catch (err) {
+  process.stderr.write(`[entry] ${err instanceof Error ? err.message : String(err)}\n`);
+  process.exit(1);
+}
