@@ -8,9 +8,9 @@
 //   3. POST $MAKEFUN_ENV_URL/register {"port": N}. The env records the address the request came from
 //      plus N as your base URL and dials it from then on. The first register wins; a 409 means another
 //      entry already registered, and this process keeps waiting like any other.
-//   4. GET $MAKEFUN_ENV_URL/done until the body is {"done": true}. The env answers at once ({"done":
-//      false} while the suite runs), so this is a poll, not a long-held request. A failed or slow poll
-//      is retried with a short exponential backoff; the process never exits before the env says done.
+//   4. GET $MAKEFUN_ENV_URL/done until the body is {"done": true}. Each request may be long-held by
+//      the env; a quick {"done": false} is followed by a short gap, while a failed or slow poll is
+//      retried with a bounded exponential backoff. The process never exits before the env says done.
 //   5. Close the server and exit 0. The harness then stops the env, which writes the export the scorer
 //      reads.
 //
@@ -24,11 +24,14 @@ if (ENV_URL === '') {
   process.exit(1);
 }
 
-/** How long one register or done request may take before it is abandoned and retried. */
-const REQUEST_TIMEOUT_MS = 30_000;
-/** The first wait between retries, and the longest. */
-const RETRY_INITIAL_MS = 250;
-const RETRY_MAX_MS = 2_000;
+/** The trial boot budget is tight: registration must land within 20s of process start. */
+const REQUEST_TIMEOUT_MS = 10_000;
+/** The first wait between retries, and the longest: an aggressive, bounded schedule. */
+const RETRY_INITIAL_MS = 100;
+const RETRY_MAX_MS = 500;
+/** /done is a long poll; keep each request long, and only pause briefly between done:false answers. */
+const DONE_REQUEST_TIMEOUT_MS = 30_000;
+const DONE_POLL_GAP_MS = 250;
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -60,19 +63,28 @@ async function register(port: number): Promise<void> {
   }
 }
 
-/** Poll GET /done until it answers {"done":true}; never return before that. */
+/**
+ * Poll GET /done until it answers {"done":true}; never return before that. The env long-polls this
+ * route during the suite, so a `done:false` answer means the request finished early: continue right
+ * away with only a short gap, and reserve the failure backoff for errors and non-200 answers.
+ */
 async function waitForDone(): Promise<void> {
-  for (let attempt = 0; ; attempt += 1) {
+  let failures = 0;
+  for (;;) {
     try {
-      const res = await fetch(`${ENV_URL}/done`, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+      const res = await fetch(`${ENV_URL}/done`, { signal: AbortSignal.timeout(DONE_REQUEST_TIMEOUT_MS) });
       if (res.ok) {
         const body = (await res.json()) as { done?: unknown };
         if (body.done === true) return;
+        failures = 0;
+        await sleep(DONE_POLL_GAP_MS);
+        continue;
       }
     } catch {
       // The env is not answering yet, or the poll timed out: it is not done, so poll again.
     }
-    await sleep(retryDelay(attempt));
+    await sleep(retryDelay(failures));
+    failures += 1;
   }
 }
 
