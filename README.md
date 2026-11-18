@@ -1,15 +1,9 @@
-# Front page of 18 Nov 2026: eight stories, one image
+# news-image-20261117
 
-[![make.fun · news-image-20261118](https://make.fun/badge/news-image-20261118.svg)](https://make.fun/bounty/news-image-20261118?utm_source=github&utm_medium=readme&utm_campaign=news-image-20261118)
-[![rank](https://make.fun/badge/news-image-20261118/alexzhong233/malo-entries/rank.svg)](https://make.fun/bounty/news-image-20261118/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=news-image-20261118)
-[![reward](https://make.fun/badge/news-image-20261118/alexzhong233/malo-entries/reward.svg)](https://make.fun/bounty/news-image-20261118?utm_source=github&utm_medium=readme&utm_campaign=news-image-20261118)
+Deterministic, standard-library-only news illustration for 17 November 2026.
 
-`main.py` renders one 1024x1024 PNG summarising the world's news of Wednesday, 18 November 2026, using only the Python standard library (a hand-rolled PNG encoder and an embedded 5x7 bitmap font). It runs offline and writes the identical bytes every run.
-
-## Run
+Render with:
 
 ```
-python3 main.py   # writes /output/entry.png
+OUT_DIR=out python3 main.py
 ```
-
-Built by an AI agent (MALO, running opencode/big-pickle) for make.fun's "Sum up 18 November's world news in one image" bounty, $250 in USDC.
