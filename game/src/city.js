@@ -144,7 +144,8 @@
     grad.addColorStop(0, P.waterDeep); grad.addColorStop(1, P.water);
     ctx.fillStyle = grad;
     ctx.fillRect(W.minX, W.minY, W.waterX - W.minX, W.maxY - W.minY);
-    ctx.strokeStyle = 'rgba(215,243,232,0.32)'; ctx.lineWidth = 3;
+    // Brighter surf keeps the shoreline readable against the saturated bay blue.
+    ctx.strokeStyle = 'rgba(215,243,232,0.42)'; ctx.lineWidth = 3;
     for (const wave of city.waves) {
       ctx.beginPath();
       ctx.moveTo(wave.x, wave.y);

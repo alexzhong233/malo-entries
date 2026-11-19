@@ -165,7 +165,7 @@
       }
       const a = Math.atan2(ty - ped.y, tx - ped.x);
       ped.angle = u.turnToward(ped.angle, a, 7 * dt);
-      const speed = ped.flee > 0 ? 160 : ped.speed;
+      const speed = ped.flee > 0 ? 168 : ped.speed; // panic covers ground faster than a casual stroll
       const hit = w.city.resolveCircle(ped.x + Math.cos(a) * speed * dt, ped.y + Math.sin(a) * speed * dt, 7);
       ped.x = hit.x; ped.y = hit.y;
       ped.walk += speed * dt * 0.12;

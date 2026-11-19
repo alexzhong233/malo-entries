@@ -15,16 +15,17 @@
     SB.audio.play(w.audioRef, w.wanted >= 4 ? 'siren' : 'busted');
   };
 
-  // Four and five stars add cruisers parked across the road ahead of a fleeing player.
-  function dropRoadblock(w) {
+    // Four and five stars add cruisers parked across the road ahead of a fleeing player.
+    // city.node() already returns world-space grid coordinates (i * GRID), not indices.
+    function dropRoadblock(w) {
     const p = w.player;
     const x = p.inCar ? p.inCar.x : p.x, y = p.inCar ? p.inCar.y : p.y;
     const a = p.inCar ? p.inCar.angle : p.angle;
     const node = w.city.node(x + Math.cos(a) * 480, y + Math.sin(a) * 480);
     const across = Math.abs(Math.cos(a)) > Math.abs(Math.sin(a));
     for (let k = -1; k <= 1; k += 2) {
-      const rx = node.x * SB.GRID + (across ? 19 : k * 44);
-      const ry = node.y * SB.GRID + (across ? k * 44 : 19);
+      const rx = node.x + (across ? 19 : k * 44);
+      const ry = node.y + (across ? k * 44 : 19);
       if (w.city.buildingAt(rx, ry) || u.dist(rx, ry, x, y) < 220) continue;
       const car = SB.makeCar(w, rx, ry, across ? Math.PI / 2 : 0, 'police', '#e8e8df', {
         cop: true, ai: { fire: 1, ram: 0, block: true }

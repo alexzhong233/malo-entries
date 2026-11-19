@@ -76,7 +76,8 @@
     for (const s of skids) {
       ctx.save();
       ctx.translate(s.x, s.y); ctx.rotate(s.angle);
-      ctx.fillStyle = 'rgba(42,31,22,' + (0.30 * Math.min(1, s.life / 4)).toFixed(2) + ')';
+      // Fade across the last six seconds so skid marks dissolve gradually, not all at once.
+      ctx.fillStyle = 'rgba(42,31,22,' + (0.30 * Math.min(1, s.life / 6)).toFixed(2) + ')';
       ctx.fillRect(-9, -2.5, 18, 5);
       ctx.restore();
     }

@@ -54,8 +54,10 @@
       ctx.fillStyle = P.panel; ctx.fillRect(18, F.height - 86, 286, 68);
       label(ctx, p.inCar ? p.inCar.type.toUpperCase() : (p.gun ? 'PISTOL' : 'FISTS'),
         32, F.height - 58, 20, P.text, 'left', 'bold');
-      label(ctx, p.inCar ? 'SPACE handbrake  ·  E exit' : (p.gun ? p.ammo + ' rounds  ·  G holster' : 'Right-click to punch  ·  G pistol'),
-        32, F.height - 36, 13, P.muted, 'left');
+      const hint = p.inCar ? 'SPACE handbrake  ·  E exit'
+        : p.gun ? p.ammo + ' rounds  ·  G holster' : 'Right-click to punch  ·  G pistol';
+      label(ctx, hint, 32, F.height - 36, 13,
+        !p.inCar && p.gun && p.ammo <= 6 ? P.red : P.muted, 'left'); // low ammo warns at a glance
       if (p.inCar) {
         bar(ctx, 196, F.height - 62, 94, 8, p.inCar.health / p.inCar.maxHealth, P.teal);
         label(ctx, 'CAR', 196, F.height - 72, 12, P.muted, 'left');

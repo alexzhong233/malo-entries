@@ -69,8 +69,11 @@
       if (input.mouse.x >= box.x && input.mouse.x <= box.x + box.w &&
         input.mouse.y >= box.y && input.mouse.y <= box.y + box.h) { SC.hover = i; break; }
     }
-    if (input.consume('ArrowUp') || input.consume('KeyW')) SC.selected = (SC.selected + list.length - 1) % list.length;
-    if (input.consume('ArrowDown') || input.consume('KeyS')) SC.selected = (SC.selected + 1) % list.length;
+    // Consume both bindings even when one already matched, so no press leaks into the next frame.
+    const upArrow = input.consume('ArrowUp'), upKey = input.consume('KeyW');
+    const downArrow = input.consume('ArrowDown'), downKey = input.consume('KeyS');
+    if (upArrow || upKey) SC.selected = (SC.selected + list.length - 1) % list.length;
+    if (downArrow || downKey) SC.selected = (SC.selected + 1) % list.length;
     if (input.mouse.click && SC.hover >= 0) {
       SC.selected = SC.hover;
       return list[SC.hover].action;
@@ -105,7 +108,7 @@
       shade(ctx, 0.90);
       text(ctx, 'CONTROLS', F.width / 2, 130, 58, '#fff3d2', 'center', 'bold');
       const lines = [
-        ['W A S D / ARROWS', 'Walk, sprint and drive'],
+        ['W A S D / ARROWS', 'Walk and drive'],
         ['MOUSE', 'Aim and shoot (hold for repeat)'],
         ['RIGHT CLICK / F', 'Fists'],
         ['G', 'Holster or draw pistol'],

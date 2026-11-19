@@ -53,3 +53,4 @@ writeFileSync(
     game_path_max_bytes: 1000,
   }),
 );
+console.log(`packaged Solara Bay into ${out}`);

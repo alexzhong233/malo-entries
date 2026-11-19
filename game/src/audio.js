@@ -24,7 +24,7 @@
         master.connect(ctx.destination);
 
         const filter = audio.engineFilter = ctx.createBiquadFilter();
-        filter.type = 'lowpass'; filter.frequency.value = 620;
+        filter.type = 'lowpass'; filter.frequency.value = 680; // a little more engine growl under acceleration
         const eg = audio.engineGain = ctx.createGain(); eg.gain.value = 0;
         const engine = audio.engine = ctx.createOscillator();
         engine.type = 'sawtooth'; engine.frequency.value = 60;

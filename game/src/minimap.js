@@ -21,7 +21,7 @@
       const ty = function (y) { return my + (y - W.minY) * sy; };
       ctx.save();
       ctx.beginPath(); ctx.rect(mx, my, mw, mh); ctx.clip();
-      ctx.fillStyle = '#dfc298'; ctx.fillRect(mx, my, mw, mh);
+      ctx.fillStyle = P.sand; ctx.fillRect(mx, my, mw, mh); // same beach tone as the world map
       ctx.fillStyle = P.water; ctx.fillRect(mx, my, tx(W.waterX) - mx, mh);
       ctx.fillStyle = P.grass; ctx.fillRect(tx(w.city.park.x), ty(w.city.park.y), w.city.park.w * sx, w.city.park.h * sy);
       ctx.fillStyle = '#a98560';

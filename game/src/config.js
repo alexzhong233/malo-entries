@@ -44,7 +44,8 @@
   };
   SB.DAY = { start: 8 * 60 + 20, minutesPerSecond: 5.5 };
   // One master gain shared by the WebAudio graph and its mute toggle, so they never disagree.
-  SB.AUDIO = { masterVolume: 0.32 };
+  // A touch of headroom keeps stacked sirens, engines and gunfire from clipping.
+  SB.AUDIO = { masterVolume: 0.30 };
   SB.SAVE_KEY = 'solara-bay.save.v1';
 
   SB.PALETTE = {

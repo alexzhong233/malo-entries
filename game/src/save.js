@@ -75,10 +75,9 @@
     } catch (err) { return null; }
   };
 
+  // Only offer CONTINUE when the record actually parses; a corrupt save cannot be resumed.
   SAVE.has = function () {
-    const store = storage();
-    if (!store) return false;
-    try { return !!store.getItem(KEY); } catch (err) { return false; }
+    return SAVE.read() !== null;
   };
 
   SAVE.clear = function () {

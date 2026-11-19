@@ -45,6 +45,7 @@
     w.cars.length = 0; w.peds.length = 0; w.cops.length = 0;
     w.bullets.length = 0; w.pickups.length = 0;
     w.wanted = 0; w.unseen = 0; w.copTimer = 8; w.arrest = 0;
+    w.lastLoss = 0; // a fresh run has no booking fee left over from the previous one
     w.lastGunshot = -99; w.lastExplosion = -99;
     w.effects = SB.effects.create();
     w.camera = SB.camera.create();

@@ -12,8 +12,9 @@
 
     function locate(event) {
       const rect = canvas.getBoundingClientRect();
-      mouse.x = (event.clientX - rect.left) / rect.width * F.width;
-      mouse.y = (event.clientY - rect.top) / rect.height * F.height;
+      // A collapsed (hidden) canvas must not turn the aim point into NaN.
+      mouse.x = (event.clientX - rect.left) / (rect.width || 1) * F.width;
+      mouse.y = (event.clientY - rect.top) / (rect.height || 1) * F.height;
     }
     window.addEventListener('keydown', function (event) {
       if (swallow[event.code]) event.preventDefault();

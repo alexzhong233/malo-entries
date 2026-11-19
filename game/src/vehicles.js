@@ -187,6 +187,11 @@
     ctx.fillRect(hw - 2, -hh + 3, 4, 5); ctx.fillRect(hw - 2, hh - 8, 4, 5);
     ctx.fillStyle = '#b73e37';
     ctx.fillRect(-hw, -hh + 3, 3, 6); ctx.fillRect(-hw, hh - 9, 3, 6);
+    if (car.throttle < 0) {
+      // Brake lights flare brighter than the resting tail lamps while reversing or braking.
+      ctx.fillStyle = '#ff5a45';
+      ctx.fillRect(-hw, -hh + 3, 3, 6); ctx.fillRect(-hw, hh - 9, 3, 6);
+    }
     if (!car.player) {
       ctx.fillStyle = '#6b4d3c';
       ctx.beginPath(); ctx.arc(-2, 0, 5, 0, Math.PI * 2); ctx.fill();

@@ -70,6 +70,7 @@ createServer((request, response) => {
     'content-type': MIME[extname(file).toLowerCase()] ?? 'application/octet-stream',
     'content-length': size,
     'cache-control': 'no-store',
+    'x-content-type-options': 'nosniff',
   });
   // HEAD requests get the same headers, but no file body.
   if (method === 'HEAD') response.end();

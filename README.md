@@ -27,6 +27,7 @@ and open <http://localhost:8080>.
 | Space | Handbrake / drift while driving |
 | Shift | Sprint on foot |
 | Tab | Advance the story chain |
+| C | Controls help (from play or the pause menu) |
 | M / Esc | Mute audio / pause |
 
 Four deterministic `?shot=` scenes (`foot`, `drive`, `police`, `mission`) feed the screenshot

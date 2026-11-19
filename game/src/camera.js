@@ -17,7 +17,7 @@
     const tx = x + u.clamp(vx * 0.26, -90, 90);
     const ty = y + u.clamp(vy * 0.26, -90, 90);
     // A slightly firmer follow keeps the player centred when a chase suddenly changes direction.
-    const k = 1 - Math.exp(-6.2 * dt);
+    const k = 1 - Math.exp(-6.6 * dt);
     cam.x += (tx - cam.x) * k;
     cam.y += (ty - cam.y) * k;
     const speed = car ? Math.hypot(vx, vy) : (p.moving ? (p.sprinting ? 200 : 140) : 0);

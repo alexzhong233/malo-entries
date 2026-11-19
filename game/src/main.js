@@ -92,8 +92,8 @@
   function step(dt, ctrl) {
     if (w.screen !== 'play') return;
     w.time += dt;
-    w.clock += dt * SB.DAY.minutesPerSecond;
-    if (w.clock >= 1440) w.clock -= 1440;
+    // Wrap with a modulo so the clock stays in range even after a long or throttled step.
+    w.clock = (w.clock + dt * SB.DAY.minutesPerSecond) % 1440;
     if (w.banner.time > 0) w.banner.time -= dt;
     SB.updatePlayer(w, ctrl, dt);
     SB.updateTraffic(w, dt);

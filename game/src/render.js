@@ -19,7 +19,7 @@
       vignette = ctx.createRadialGradient(F.width / 2, F.height / 2, F.height * 0.34,
         F.width / 2, F.height / 2, F.height * 0.92);
       vignette.addColorStop(0, 'rgba(10,18,24,0)');
-      vignette.addColorStop(1, 'rgba(10,18,24,0.30)');
+      vignette.addColorStop(1, 'rgba(10,18,24,0.26)'); // lighter corners than the original grade
     }
 
     function cityCache(city) {

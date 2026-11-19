@@ -18,7 +18,8 @@
     if (p.inCar) {
       const car = p.inCar;
       p.angle = Math.atan2(aim.y - car.y, aim.x - car.x);
-      SB.driveCar(w, car, input.axis('KeyS', 'KeyW'), input.axis('KeyD', 'KeyA'), input.isDown('Space'), dt);
+      // Positive steer rotates the heading clockwise on screen, so D is the right-turn key.
+      SB.driveCar(w, car, input.axis('KeyS', 'KeyW'), input.axis('KeyA', 'KeyD'), input.isDown('Space'), dt);
       p.x = car.x; p.y = car.y;
       if (input.consume('KeyE')) SB.exitCar(w);
       if (input.mouse.down && p.fire <= 0 && p.gun && p.ammo > 0) SB.shoot(w, 0.10);

@@ -127,7 +127,7 @@
     if (index === 2) return copy(stage === 0 ? SPOTS.beach : SPOTS.rico);
     if (index === 3) return copy(stage === 0 ? SPOTS.dock : SPOTS.harbor);
     if (index === 4) return copy(SPOTS.north);
-    if (index === 5) return copy(stage === 0 ? SPOTS.neon : SPOTS.neon);
+    if (index === 5) return copy(SPOTS.neon); // both stages share the Neon Mile arena
     if (index === 6) return copy(stage === 0 ? SPOTS.officeDoor : SPOTS.finalEscape);
     return copy(SPOTS.marisol);
   }

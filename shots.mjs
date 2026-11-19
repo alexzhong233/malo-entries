@@ -90,7 +90,7 @@ for (const file of readdirSync(shotDir)) {
 const browser = await chromium.launch({
   executablePath: browserPath,
   headless: true,
-  args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-background-timer-throttling']
+  args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-background-timer-throttling', '--disable-renderer-backgrounding']
 });
 const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
 const results = [];
@@ -175,7 +175,7 @@ try {
   }
 
   // Systems smoke test in the same browser: audio nodes, effects, police escalation, the complete
-// seven-job chain and a save round-trip. It runs off-page and never touches the four captures.
+  // seven-job chain and a save round-trip. It runs off-page and never touches the four captures.
 const smokePage = await context.newPage();
 const smokeErrors = [];
 smokePage.on('pageerror', (e) => smokeErrors.push(String(e)));
@@ -354,7 +354,7 @@ console.log(`perf: ${perf.fps} fps average, p95 frame ${perf.p95ms} ms with ${re
 if (readdirSync(shotDir).length !== 4) throw new Error('screenshots/ must hold exactly four files');
 writeFileSync(join(here, 'shots.json'), JSON.stringify(results.map((r) => {
   const shot = SHOTS.find((s) => s.name === r.name);
-  return { name: r.name, mode: r.mode, seed: shot.seed, query: `?shot=${r.mode}&seed=${shot.seed}` };
+  return { name: r.name, mode: r.mode, seed: shot.seed, waitMs: shot.wait, query: `?shot=${r.mode}&seed=${shot.seed}` };
 }), null, 2) + '\n');
 console.log('shots.json updated; exactly four screenshots verified.');
 } finally {
