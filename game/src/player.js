@@ -127,8 +127,11 @@
   SB.exitCar = function (w) {
     const p = w.player, car = p.inCar;
     if (!car) return;
-    const side = car.angle + Math.PI / 2;
-    const spot = w.city.resolveCircle(car.x + Math.cos(side) * 36, car.y + Math.sin(side) * 36, P.radius);
+    // Take the door with more clearance so a wall on one side cannot shove the player across the car.
+    const exitAngle = car.angle + Math.PI / 2;
+    const left = w.city.resolveCircle(car.x + Math.cos(exitAngle) * 36, car.y + Math.sin(exitAngle) * 36, P.radius);
+    const right = w.city.resolveCircle(car.x - Math.cos(exitAngle) * 36, car.y - Math.sin(exitAngle) * 36, P.radius);
+    const spot = u.dist(left.x, left.y, car.x, car.y) <= u.dist(right.x, right.y, car.x, car.y) ? left : right;
     p.x = spot.x; p.y = spot.y;
     car.player = false; car.occupied = false;
     p.inCar = null;

@@ -375,7 +375,7 @@
           advance(w);
           m.target = copy(SPOTS.rico);
           SB.addPickup(w, w.player.x, w.player.y, 'cash', 80);
-          JOBS.talk(w, [[C.driver.name, 'Got it. Rico is at the harbor. Bring it to my bench in the park.']],
+          JOBS.talk(w, [[C.driver.name, 'Got it. Bring the package to Marisol\'s bench in the park.']],
             'Carry the package to the park');
         } else if (m.stage === 1 && arrive(w, 64, false)) {
           JOBS.pay(w, C.fixer.name + ': "Package is safe. You are proving useful."');

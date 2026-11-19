@@ -55,8 +55,9 @@
     for (let i = fx.particles.length - 1; i >= 0; i -= 1) {
       const p = fx.particles[i];
       p.x += p.vx * dt; p.y += p.vy * dt;
-      p.vx *= 1 - (p.kind === 'smoke' ? 1.1 : 2.2) * dt;
-      p.vy *= 1 - (p.kind === 'smoke' ? 1.1 : 2.2) * dt;
+      const drag = p.kind === 'smoke' ? 1.0 : 2.2; // smoke drifts a touch longer than sparks
+      p.vx *= 1 - drag * dt;
+      p.vy *= 1 - drag * dt;
       if (p.kind === 'smoke') p.r += 9 * dt;
       p.life -= dt;
       if (p.life <= 0) fx.particles.splice(i, 1);

@@ -97,7 +97,7 @@
     w.money = data.money;
     w.wanted = data.wanted;
     w.clock = data.clock;
-    w.copTimer = data.wanted > 0 ? 1 : 8;
+    w.copTimer = data.wanted >= 4 ? 1 : 2.5; // saved heat brings backup quickly
     w.stats = { kills: data.stats.kills, cars: data.stats.cars, missions: data.stats.missions };
     w.camera.x = data.x; w.camera.y = data.y;
     SB.missions.resume(w, data.missionIndex, data.missionDone);

@@ -115,7 +115,8 @@
         ['E (HOLD)', 'Enter and hotwire the nearest car'],
         ['SPACE', 'Handbrake / drift'],
         ['SHIFT', 'Sprint on foot'],
-        ['TAB', 'Start the next job'],
+        ['TAB', 'Start / skip the next job'],
+        ['C', 'Show this help again'],
         ['M', 'Mute audio'],
         ['ESC', 'Pause']
       ];

@@ -1,7 +1,8 @@
 /* Solara Bay: one fixed logical playfield, scaled to fit the window. */
 html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1118; }
 body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
-#stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+/* A soft halo behind the letterboxed canvas beats a flat black letterbox on bright desktops. */
+#stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 42%, #17232d, #0b1118 72%); }
 #game {
   display: block;
   width: 1280px;

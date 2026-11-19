@@ -35,6 +35,8 @@ const MIME: Record<string, string> = {
   '.mp3': 'audio/mpeg',
   '.ogg': 'audio/ogg',
   '.txt': 'text/plain; charset=utf-8',
+  '.map': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json',
 };
 
 createServer((request, response) => {

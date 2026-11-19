@@ -165,6 +165,9 @@
     ctx.fillStyle = car.isCop ? '#e9e9e1' : car.color;
     if (car.type === 'taxi' && !car.isCop) ctx.fillStyle = '#f0c33e';
     ctx.fillRect(-hw, -hh, car.w, car.h);
+    // A thin roof sheen keeps silhouettes readable against pale midday asphalt.
+    ctx.fillStyle = 'rgba(255,255,255,0.10)';
+    ctx.fillRect(-hw + 5, -hh + 2, car.w - 10, 2);
     ctx.fillStyle = 'rgba(20,30,35,0.28)';
     ctx.fillRect(-hw, hh - 5, car.w, 5);
     if (car.isCop) {

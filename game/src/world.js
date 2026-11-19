@@ -17,6 +17,7 @@
       },
       cars: [], peds: [], cops: [], bullets: [], pickups: [],
       wanted: 0, unseen: 0, copTimer: 6, arrest: 0,
+      lastLoss: 0, // no booking fee before the first downPlayer() call
       lastGunshot: -99, lastExplosion: -99,
       banner: { text: '', sub: '', time: 0 },
       mission: {
@@ -201,7 +202,7 @@
 
   SB.hurtPlayer = function (w, amount, reason) {
     const p = w.player;
-    if (w.screen !== 'play' || p.hurt > 0.55 && reason === 'ram') return;
+    if (w.screen !== 'play' || (p.hurt > 0.55 && reason === 'ram')) return;
     p.health -= amount;
     p.hurt = 0.2;
     SB.effects.burst(w, p.x, p.y, 'blood', 4);

@@ -25,7 +25,7 @@
       label(ctx, w.wanted ? 'WANTED' : 'CLEAN', 290, 62, 12, w.wanted ? P.red : P.muted, 'right', 'bold');
       const hpColor = p.health < 35 ? P.red : p.health < 65 ? P.gold : P.green;
       bar(ctx, 32, 70, 174, 11, p.health / SB.PLAYER.maxHealth, hpColor);
-      label(ctx, 'HP ' + Math.max(0, Math.ceil(p.health)), 216, 81, 13, P.text, 'left');
+      label(ctx, 'HP ' + Math.max(0, Math.ceil(p.health)), 216, 81, 13, hpColor, 'left');
       let stars = '';
       for (let i = 0; i < 5; i += 1) stars += i < w.wanted ? '★' : '☆';
       if (w.wanted) { ctx.shadowColor = P.gold; ctx.shadowBlur = 8; }

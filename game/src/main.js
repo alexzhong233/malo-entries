@@ -140,7 +140,7 @@
       SB.audio.update(audio, w);
       renderer.draw(w);
     }
-    announce('Solara Bay. Press Enter to start.');
+    announce('Solara Bay. Press Enter or choose START NEW GAME to begin.');
     requestAnimationFrame(frame);
     window.addEventListener('beforeunload', function () { if (!shotState) saveGame(); });
     // Background tabs stop animation frames; save before the browser suspends the page.

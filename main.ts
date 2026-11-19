@@ -24,8 +24,9 @@ if (resolve(out) === resolve(here)) throw new Error('MAKEFUN_OUTPUT_DIR must not
 // Refresh the renders when the recorder and its Chromium are installed. A machine without that
 // optional tooling still packages the checked-in screenshots, so the build never fails over it.
 if (process.env.MAKEFUN_SKIP_SHOTS !== '1' && existsSync(join(here, 'shots.mjs'))) {
+  // First headless launch can be slow on a cold cache; give the recorder room to finish.
   const refresh = spawnSync(process.execPath, [join(here, 'shots.mjs')], {
-    cwd: here, encoding: 'utf8', timeout: 180_000
+    cwd: here, encoding: 'utf8', timeout: 240_000
   });
   if (refresh.status === 0) process.stdout.write(refresh.stdout);
   else console.warn(`screenshot refresh skipped: ${refresh.error ? refresh.error.message : (refresh.stderr || '').trim()}`);

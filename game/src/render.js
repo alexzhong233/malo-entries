@@ -64,7 +64,8 @@
       ctx.beginPath(); ctx.arc(0, -18, 9 * pulse, 0, Math.PI * 2); ctx.stroke();
       ctx.fillStyle = P.gold;
       ctx.beginPath(); ctx.moveTo(0, -4); ctx.lineTo(7, -16); ctx.lineTo(-7, -16); ctx.closePath(); ctx.fill();
-      ctx.font = 'bold 11px ' + SB.FONT; ctx.textAlign = 'center'; ctx.fillText(m.label, 0, -32);
+      // Set the baseline explicitly: earlier world drawing may have left a different one on the context.
+      ctx.font = 'bold 11px ' + SB.FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(m.label, 0, -32);
       ctx.restore();
     }
 

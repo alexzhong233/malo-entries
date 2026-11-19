@@ -15,9 +15,9 @@
     SB.audio.play(w.audioRef, w.wanted >= 4 ? 'siren' : 'busted');
   };
 
-    // Four and five stars add cruisers parked across the road ahead of a fleeing player.
-    // city.node() already returns world-space grid coordinates (i * GRID), not indices.
-    function dropRoadblock(w) {
+  // Four and five stars add cruisers parked across the road ahead of a fleeing player.
+  // city.node() already returns world-space grid coordinates (i * GRID), not indices.
+  function dropRoadblock(w) {
     const p = w.player;
     const x = p.inCar ? p.inCar.x : p.x, y = p.inCar ? p.inCar.y : p.y;
     const a = p.inCar ? p.inCar.angle : p.angle;
@@ -57,7 +57,7 @@
   SB.spawnFootCop = function (w) {
     const s = roadSpawn(w);
     const ped = SB.spawnPed(w, s.x, s.y, { cop: true });
-    ped.speed = 132;
+    ped.speed = 134; // keeps up with traffic, but never with a sprinting player
     return ped;
   };
 

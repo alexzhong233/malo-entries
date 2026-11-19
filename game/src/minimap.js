@@ -33,7 +33,7 @@
       for (const b of w.city.buildings) ctx.fillRect(tx(b.x), ty(b.y), Math.max(1, b.w * sx), Math.max(1, b.h * sy));
       const marker = SB.missions.marker(w);
       if (marker) {
-        const pulse = 3 + Math.sin(w.time * 5) * 1.5;
+        const pulse = 3 + Math.sin(w.time * 4.5) * 1.5; // unhurried beat, like the world marker
         ctx.strokeStyle = P.gold; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(tx(marker.x), ty(marker.y), pulse + 3, 0, Math.PI * 2); ctx.stroke();
         ctx.fillStyle = P.gold;

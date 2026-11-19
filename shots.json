@@ -10,7 +10,7 @@
     "name": "02-drive-traffic.jpg",
     "mode": "drive",
     "seed": 11,
-    "waitMs": 4000,
+    "waitMs": 4500,
     "query": "?shot=drive&seed=11"
   },
   {

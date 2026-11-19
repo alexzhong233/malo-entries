@@ -152,7 +152,7 @@
       ctx.quadraticCurveTo(wave.x + wave.w / 2, wave.y + 6, wave.x + wave.w, wave.y);
       ctx.stroke();
     }
-    ctx.strokeStyle = P.foam; ctx.lineWidth = 5; ctx.beginPath();
+    ctx.strokeStyle = P.foam; ctx.lineWidth = 4.5; ctx.beginPath(); // a softer tide line
     for (let y = W.minY; y <= W.maxY; y += 12) {
       const x = W.waterX + Math.sin(y * 0.037) * 5;
       if (y === W.minY) ctx.moveTo(x, y); else ctx.lineTo(x, y);

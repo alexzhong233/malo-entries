@@ -88,7 +88,7 @@
         src.playbackRate.value = name === 'explosion' ? 0.55 : name === 'punch' ? 0.8 : 1.4;
         const filter = ctx.createBiquadFilter();
         filter.type = name === 'explosion' ? 'lowpass' : 'bandpass';
-        filter.frequency.value = name === 'explosion' ? 420 : name === 'punch' ? 350 : 1600;
+        filter.frequency.value = name === 'explosion' ? 420 : name === 'punch' ? 350 : 1800; // crisper gunfire crack
         const gain = ctx.createGain();
         const peak = name === 'explosion' ? 0.42 : name === 'punch' ? 0.18 : 0.22;
         const dur = name === 'explosion' ? 0.7 : name === 'punch' ? 0.12 : 0.14;

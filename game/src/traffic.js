@@ -103,7 +103,7 @@
       // Yield: ease off when another car sits just ahead.
       ai.yield -= dt;
       if (ai.yield <= 0) {
-        ai.yield = 0.25;
+        ai.yield = 0.2; // recheck the road ahead a little more often
         for (const other of w.cars) {
           if (other === car || other.dead) continue;
           const d = u.dist(other.x, other.y, car.x, car.y);

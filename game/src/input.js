@@ -55,7 +55,8 @@
         mouse.click = false;
       },
       aim: function (cam) { return SB.camera.toWorld(cam, mouse.x, mouse.y); },
-      firstGesture: function () { mouse.click = false; return true; }
+      // Clear both the click flag and its queued key so a synthetic first gesture cannot leak into a menu.
+      firstGesture: function () { mouse.click = false; pressed.Mouse0 = false; return true; }
     };
   };
 })(window.SB = window.SB || {});

@@ -12,8 +12,9 @@ SOLARA BAY — a sun-soaked top-down open-world crime game in the GTA spirit: pr
 mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 ```
 
-The packaged build lives in `out/`. For a quick local play without packaging, run `node serve.ts`
-and open <http://localhost:8080>.
+The packaged build lives in `out/`. The game itself needs no install or build step; the optional
+screenshot refresh only runs when local Chromium tooling is present. For a quick local play without
+packaging, run `node serve.ts` and open <http://localhost:8080>.
 
 ## Controls
 

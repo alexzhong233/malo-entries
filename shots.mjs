@@ -14,7 +14,7 @@ const port = 8137 + (process.pid % 500);
 
 const SHOTS = [
   { name: '01-solara-bay-foot.jpg', mode: 'foot', seed: 7, wait: 4000 },
-  { name: '02-drive-traffic.jpg', mode: 'drive', seed: 11, wait: 4000 },
+  { name: '02-drive-traffic.jpg', mode: 'drive', seed: 11, wait: 4500 },
   { name: '03-police-chase.jpg', mode: 'police', seed: 23, wait: 7000 },
   { name: '04-mission.jpg', mode: 'mission', seed: 31, wait: 4000 }
 ];
@@ -90,7 +90,8 @@ for (const file of readdirSync(shotDir)) {
 const browser = await chromium.launch({
   executablePath: browserPath,
   headless: true,
-  args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-background-timer-throttling', '--disable-renderer-backgrounding']
+  // A fixed colour profile keeps the JPEG palette stable across machines.
+  args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--force-color-profile=srgb']
 });
 const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
 const results = [];
