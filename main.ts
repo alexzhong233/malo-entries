@@ -50,6 +50,11 @@ if (issue !== null) {
   process.exit(1);
 }
 
+/** Watchlist coverage: watchlist slugs that actually made it onto the board, from the loaded data. */
+const boardSlugs = new Set(board.map((row) => row.slug));
+const covered = snapshot.watchlist.reduce((count, slug) => count + (boardSlugs.has(slug) ? 1 : 0), 0);
+const coverageSummary = `watchlist coverage: ${covered} / ${snapshot.watchlist.length}`;
+
 mkdirSync(out, { recursive: true });
 writeFileSync(join(out, 'board.json'), `${JSON.stringify({ rows: board })}\n`);
 writeFileSync(join(out, 'data.js'), dataScript(radar));
@@ -85,7 +90,10 @@ for (const name of shots) {
 // The dossier is written last: the scorer rebuilds it from this /output and compares bytes.
 writeFileSync(join(out, 'dossier.json'), buildDossier(out, { text_max_bytes: TEXT_MAX_BYTES, screenshots: SCREENSHOT_CAPS, dashboard: { max_files: 400, max_bytes: 4_194_304 } }));
 
+// The coverage line is part of the run summary on both streams: stderr for operators, stdout for logs.
+process.stderr.write(`${coverageSummary}\n`);
 process.stdout.write(
   `token radar: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ${board.length} rows scored (${radar.early_size} early, ${radar.live_size} live set aside)\n` +
-    `token radar: wrote ${join(out, 'board.json')}, ${join(out, 'data.js')}, ${join(out, 'dashboard')} (3 files), ${join(out, 'screenshots')} (${shots.length} images) and ${join(out, 'dossier.json')}\n`,
+    `token radar: wrote ${join(out, 'board.json')}, ${join(out, 'data.js')}, ${join(out, 'dashboard')} (3 files), ${join(out, 'screenshots')} (${shots.length} images) and ${join(out, 'dossier.json')}\n` +
+    `${coverageSummary}\n`,
 );
