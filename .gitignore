@@ -1,4 +1,4 @@
-node_modules/
+__pycache__/
 out/
-*.log
-.DS_Store
+*.pyc
+entry.png

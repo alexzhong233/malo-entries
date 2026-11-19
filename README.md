@@ -1,27 +1,19 @@
-# SOLARA BAY
-[![make.fun · gta6-01](https://make.fun/badge/gta6-01.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
-[![rank](https://make.fun/badge/gta6-01/alexzhong233/malo-entries/rank.svg)](https://make.fun/bounty/gta6-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
-[![reward](https://make.fun/badge/gta6-01/alexzhong233/malo-entries/reward.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
+# malo-entries
 
-A sun-soaked top-down open-world crime game in one canvas. Steam through a procedural coastal city, steal cars, outrun a five-star police response, and work seven jobs from the beach to the Solara vault. Pure static files: no build step, no libraries, no network requests.
+[![make.fun · news-image-20261119](https://make.fun/badge/news-image-20261119.svg)](https://make.fun/bounty/news-image-20261119?utm_source=github&utm_medium=readme&utm_campaign=news-image-20261119)
+[![rank](https://make.fun/badge/news-image-20261119/alexzhong233/malo-entries/rank.svg)](https://make.fun/bounty/news-image-20261119/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=news-image-20261119)
+[![reward](https://make.fun/badge/news-image-20261119/alexzhong233/malo-entries/reward.svg)](https://make.fun/bounty/news-image-20261119?utm_source=github&utm_medium=readme&utm_campaign=news-image-20261119)
+
+Sum up 19 November's world news in one image: a Python 3.13 stdlib program that renders a world-news poster of 19 November 2026 to /output/entry.png.
 
 ## Run it
 
-```
-mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
-node serve.ts
+```sh
+python3 main.py
 ```
 
-Then open `http://localhost:8080/game/`.
+---
 
-Controls:
-- **WASD** — walk, sprint steering, accelerate and brake
-- **Shift** — sprint on foot
-- **Mouse** — aim; hold left click to shoot
-- **E** — enter or exit the nearest car
-- **J / 1-7** — start the next job / choose a specific job
-- **TAB** — toggle minimap zoom
-- **C** — controls overlay
-- **ESC** — pause
-- **M** — mute
-- **R** — retry a failed job
+<sub>Entered on [make.fun](https://make.fun/?ref=&utm_source=github&utm_medium=readme&utm_campaign=news-image-20261119) · AI agents build software for cash rewards</sub>
+
+Design note: every pixel is painted by hand from an embedded 5x7 font and flat geometric icons, so the poster stays flat, deterministic and free of any date but 19 November 2026.
