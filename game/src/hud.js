@@ -1,154 +1,134 @@
-(function (SB) {
+/* SOLARA BAY - health, money, wanted stars, objective and speedometer. */
+(function () {
   'use strict';
-
-  var CFG = SB.CFG, U = SB.U, C = SB.CFG.COLORS;
-  var sessionWorld = null, sessionStart = 0;
-
-  function sessionLabel(world) {
-    if (sessionWorld !== world) { sessionWorld = world; sessionStart = 0; }
-    if (!sessionStart && world.state === 'playing') sessionStart = Date.now();
-    var secs = sessionStart ? Math.max(0, Math.floor((Date.now() - sessionStart) / 1000)) : 0;
-    var mm = Math.floor(secs / 60), ss = secs % 60;
-    return (mm < 10 ? '0' : '') + mm + ':' + (ss < 10 ? '0' : '') + ss;
-  }
+  const SB = (window.SB = window.SB || {});
+  const U = SB.U;
 
   function panel(ctx, x, y, w, h, alpha) {
-    ctx.fillStyle = 'rgba(15,22,32,' + (alpha === undefined ? 0.72 : alpha) + ')';
-    U.roundRect(ctx, x, y, w, h, 9); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,226,160,0.28)'; ctx.lineWidth = 1;
-    U.roundRect(ctx, x + 0.5, y + 0.5, w - 1, h - 1, 9); ctx.stroke();
-  }
-
-  function text(ctx, str, x, y, size, color, weight, align) {
-    ctx.font = (weight || 'bold') + ' ' + size + 'px "Trebuchet MS", Arial, sans-serif';
-    ctx.fillStyle = color || C.hud;
-    ctx.textAlign = align || 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(str, x, y);
-  }
-
-  function star(ctx, x, y, r, lit) {
+    ctx.fillStyle = 'rgba(24,26,38,' + (alpha === undefined ? 0.62 : alpha) + ')';
     ctx.beginPath();
-    for (var i = 0; i < 10; i++) {
-      var a = -Math.PI / 2 + i * Math.PI / 5;
-      var rr = i % 2 ? r * 0.46 : r;
-      var px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr;
-      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    ctx.roundRect ? ctx.roundRect(x, y, w, h, 10) : ctx.rect(x, y, w, h);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,225,160,0.18)';
+    ctx.lineWidth = 1; ctx.stroke();
+  }
+  function bar(ctx, x, y, w, h, pct, color) {
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = color; ctx.fillRect(x + 1, y + 1, Math.max(0, (w - 2) * pct), h - 2);
+    ctx.strokeStyle = 'rgba(255,245,220,0.3)'; ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+  }
+
+  const HUD = {
+    draw: function (ctx, W, H, game) {
+      const p = SB.Player.state;
+      ctx.save();
+      ctx.textBaseline = 'middle';
+
+      panel(ctx, 22, 20, 246, 76);
+      ctx.font = 'bold 11px Arial'; ctx.fillStyle = '#ffe0a0'; ctx.textAlign = 'left';
+      ctx.fillText('HEALTH', 38, 39);
+      bar(ctx, 38, 49, 148, 12, p.health / 100, p.health > 45 ? '#62d47a' : (p.health > 20 ? '#ffc14d' : '#ff5151'));
+      ctx.font = 'bold 22px Arial'; ctx.fillStyle = '#ffe08a';
+      ctx.fillText(U.money(game.cash), 38, 79);
+      if (p.inCar) {
+        const hp = Math.max(0, p.inCar.hp / p.inCar.maxHp);
+        ctx.font = '10px Arial'; ctx.fillStyle = '#d8d4c8'; ctx.fillText('CAR', 197, 39);
+        bar(ctx, 197, 49, 56, 12, hp, hp > 0.4 ? '#6ec7e8' : '#ff6b4d');
+      }
+
+      // Session timer, tucked in beside the cash readout.
+      const secs = Math.max(0, Math.floor(game.elapsed || 0));
+      const stamp = String(Math.floor(secs / 60)).padStart(2, '0') + ':' + String(secs % 60).padStart(2, '0');
+      ctx.textAlign = 'right'; ctx.font = 'bold 11px Arial'; ctx.fillStyle = '#c9c3b2';
+      ctx.fillText('TIME ' + stamp, 254, 79);
+
+      // Wanted level.
+      const wr = 5 * 26 + 34;
+      panel(ctx, W - wr - 22, 20, wr, 52);
+      ctx.textAlign = 'right'; ctx.font = 'bold 10px Arial'; ctx.fillStyle = '#ffe0a0';
+      ctx.fillText('WANTED', W - 40, 33);
+      for (let i = 0; i < 5; i++) {
+        const x = W - wr - 4 + 26 * (i + 1) - 8, y = 55;
+        U.starPath(ctx, x, y, 8.5, 3.8);
+        ctx.fillStyle = i < SB.Police.wanted ? '#ffcb3c' : 'rgba(255,255,255,0.16)';
+        ctx.fill();
+        if (i < SB.Police.wanted) {
+          ctx.strokeStyle = '#8b5714'; ctx.lineWidth = 1; ctx.stroke();
+        }
+      }
+      if (SB.Police.wanted > 0 && SB.Police.evade > 3) {
+        ctx.textAlign = 'center'; ctx.font = '11px Arial'; ctx.fillStyle = '#ffd87a';
+        ctx.fillText('LOSING THEM...', W - wr / 2 - 22, 86);
+      }
+
+      // Objective card.
+      const obj = SB.Missions.objective();
+      const ow = 360;
+      panel(ctx, (W - ow) / 2, 20, ow, obj ? 72 : 48, 0.7);
+      ctx.textAlign = 'center';
+      if (obj) {
+        ctx.font = 'bold 12px Arial'; ctx.fillStyle = '#ffcf62';
+        ctx.fillText('JOB ' + (SB.Missions.active.job + 1) + '/7  ·  ' + obj.job.toUpperCase(), W / 2, 37);
+        ctx.font = 'bold 15px Arial'; ctx.fillStyle = '#fff6e2';
+        ctx.fillText(obj.label, W / 2, 58);
+        if (obj.timeLeft) {
+          ctx.font = '12px Arial'; ctx.fillStyle = obj.timeLeft < 15 ? '#ff6b6b' : '#ffd78a';
+          ctx.fillText(obj.timeLeft.toFixed(1) + 's LEFT', W / 2, 78);
+        } else if (obj.hold > 0 || obj.stay > 0) {
+          bar(ctx, W / 2 - 90, 76, 180, 8, obj.hold || obj.stay, '#ffc94d');
+        }
+      } else if (SB.Missions.index < 7) {
+        ctx.font = 'bold 14px Arial'; ctx.fillStyle = '#fff1c9';
+        ctx.fillText('PRESS J TO START: ' + SB.Missions.jobs[SB.Missions.index].name.toUpperCase(), W / 2, 38);
+        ctx.font = '11px Arial'; ctx.fillStyle = '#c9bda2';
+        ctx.fillText('Keys 1-7 choose any job · free roam the sun-soaked bay', W / 2, 56);
+      } else {
+        ctx.font = 'bold 14px Arial'; ctx.fillStyle = '#ffe08a';
+        ctx.fillText('ALL SEVEN JOBS COMPLETE — THE SOLARA SCORE IS YOURS', W / 2, 44);
+      }
+
+      if (p.inCar) this.speedometer(ctx, W - 118, H - 128, p.inCar);
+
+      // Bottom hint strip.
+      ctx.textAlign = 'center'; ctx.font = '11px Arial'; ctx.fillStyle = 'rgba(255,246,226,0.68)';
+      ctx.fillText('WASD drive/walk   E enter/exit   LMB shoot   TAB map zoom   C controls   ESC pause   M mute', W / 2, H - 18);
+
+      if (p.health < 30) {
+        const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.24, W / 2, H / 2, H * 0.75);
+        g.addColorStop(0, 'rgba(180,0,0,0)'); g.addColorStop(1, 'rgba(170,0,0,0.32)');
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      }
+
+      // Crosshair.
+      const mx = SB.Input.mouse.x, my = SB.Input.mouse.y;
+      ctx.strokeStyle = 'rgba(255,245,210,0.9)'; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(mx - 10, my); ctx.lineTo(mx - 3, my);
+      ctx.moveTo(mx + 3, my); ctx.lineTo(mx + 10, my);
+      ctx.moveTo(mx, my - 10); ctx.lineTo(mx, my - 3);
+      ctx.moveTo(mx, my + 3); ctx.lineTo(mx, my + 10);
+      ctx.stroke();
+      ctx.restore();
+    },
+
+    speedometer: function (ctx, cx, cy, car) {
+      const mph = Math.round(Math.abs(car.vx * Math.cos(car.a) + car.vy * Math.sin(car.a)) * 0.42);
+      ctx.save();
+      ctx.fillStyle = 'rgba(20,23,34,0.68)';
+      ctx.beginPath(); ctx.arc(cx, cy, 60, 0, U.TAU); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,225,160,0.28)'; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.arc(cx, cy, 50, Math.PI * 0.75, Math.PI * 2.25); ctx.stroke();
+      ctx.strokeStyle = '#ffcf57'; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.arc(cx, cy, 50, Math.PI * 0.75,
+        Math.PI * 0.75 + Math.PI * 1.5 * U.clamp(mph / 145, 0, 1)); ctx.stroke();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#fff4d6'; ctx.font = 'bold 30px Arial';
+      ctx.fillText(String(mph), cx, cy - 5);
+      ctx.font = 'bold 10px Arial'; ctx.fillStyle = '#d5c9ac';
+      ctx.fillText('MPH', cx, cy + 19);
+      ctx.restore();
     }
-    ctx.closePath();
-    if (lit) {
-      ctx.fillStyle = '#ffd45e'; ctx.fill();
-      ctx.strokeStyle = '#8b5c1d'; ctx.lineWidth = 1.4; ctx.stroke();
-    } else {
-      ctx.strokeStyle = 'rgba(255,230,170,0.34)'; ctx.lineWidth = 1.4; ctx.stroke();
-    }
-  }
+  };
 
-  function wanted(ctx, world, W) {
-    var x = W - 214, y = 22;
-    panel(ctx, x, y, 194, 34, 0.68);
-    for (var i = 0; i < 5; i++) star(ctx, x + 22 + i * 34, y + 17, 11, i < world.wanted);
-    if (world.heat > 0 && world.wanted > 0) {
-      ctx.fillStyle = 'rgba(255,212,94,0.85)';
-      ctx.fillRect(x + 16, y + 29, 162 * (world.heat / 100), 2);
-    }
-  }
-
-  function missionPanel(ctx, world) {
-    var m = world.mission, d = world.dialog;
-    if (m || d || world.missionPrompt) panel(ctx, 20, 20, 395, 104, 0.74);
-    if (m && d) {
-      var def = SB.Missions.JOBS[m.index], st = def.stages[m.stage];
-      text(ctx, def.name, 36, 32, 16, C.gold);
-      text(ctx, st.text, 36, 55, 14, C.hud, 'normal');
-      var extra = '';
-      if (st.type === 'wait') extra = 'HOLD POSITION  ' + Math.max(0, st.time - m.stageElapsed).toFixed(1) + 's';
-      else if (st.type === 'shoot') extra = 'TARGETS  ' + m.hits + ' / ' + st.count;
-      else if (st.type === 'escape') extra = 'LOSS PROGRESS  ' + Math.min(100, Math.floor(m.escapeTimer / 4 * 100)) + '%';
-      else if (st.type === 'drive') extra = 'STAY IN THE CAR';
-      if (extra) text(ctx, extra, 36, 82, 12, '#9cf0c0');
-    } else if (d) {
-      text(ctx, d.speaker.toUpperCase(), 36, 32, 15, C.gold);
-      text(ctx, d.text, 36, 55, 13, C.hud, 'normal');
-    } else if (world.missionPrompt && !m) {
-      text(ctx, 'NEW JOB AVAILABLE', 36, 32, 15, C.gold);
-      text(ctx, SB.Missions.JOBS[world.missionIndex].name, 36, 56, 18, C.hud);
-      text(ctx, 'Press F to accept', 36, 83, 13, '#9cf0c0', 'normal');
-    }
-  }
-
-  function vitals(ctx, world, W, H) {
-    var p = world.player;
-    panel(ctx, 20, H - 98, 260, 78, 0.72);
-    text(ctx, 'HEALTH', 36, H - 88, 11, 'rgba(255,255,255,0.65)');
-    text(ctx, 'SESSION ' + sessionLabel(world), 258, H - 88, 10, 'rgba(255,255,255,0.65)', 'bold', 'right');
-    var hp = U.clamp(p.health / CFG.PLAYER.MAX_HEALTH, 0, 1);
-    ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    U.roundRect(ctx, 36, H - 70, 222, 13, 6); ctx.fill();
-    ctx.fillStyle = hp > 0.5 ? '#68d391' : (hp > 0.25 ? '#f6c85f' : '#ff5d55');
-    U.roundRect(ctx, 36, H - 70, Math.max(3, 222 * hp), 13, 6); ctx.fill();
-    text(ctx, U.cash(world.cash), 36, H - 48, 22, C.gold);
-    text(ctx, 'CASH', 164, H - 43, 11, 'rgba(255,255,255,0.6)');
-    if (SB.Audio.isMuted()) text(ctx, 'MUTED', 216, H - 43, 10, '#ff9b90');
-  }
-
-  function speedo(ctx, world, W, H) {
-    var p = world.player;
-    if (!p.car) return;
-    var car = p.car, x = W - 214, y = H - 130;
-    panel(ctx, x, y, 194, 110, 0.7);
-    var kmh = Math.round(Math.abs(car.speed) * 0.62);
-    text(ctx, String(kmh), x + 96, y + 18, 42, C.hud, 'bold', 'center');
-    text(ctx, 'KM/H', x + 96, y + 66, 11, 'rgba(255,255,255,0.65)', 'bold', 'center');
-    var ratio = U.clamp(Math.abs(car.speed) / car.maxSpeed, 0, 1);
-    ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    U.roundRect(ctx, x + 18, y + 84, 158, 8, 4); ctx.fill();
-    ctx.fillStyle = ratio > 0.85 ? '#ff7b62' : '#6bd3e6';
-    U.roundRect(ctx, x + 18, y + 84, Math.max(2, 158 * ratio), 8, 4); ctx.fill();
-    text(ctx, car.health < 60 ? 'DAMAGED ' + Math.floor(car.health) + '%' : car.type.toUpperCase(),
-      x + 96, y + 96, 10, car.health < 60 ? '#ff7b62' : 'rgba(255,255,255,0.6)', 'bold', 'center');
-  }
-
-  function clockPanel(ctx, world, W) {
-    var x = W * 0.5 - 78;
-    panel(ctx, x, 20, 156, 32, 0.58);
-    text(ctx, U.clock(world.clock), x + 78, 28, 15, C.hud, 'bold', 'center');
-  }
-
-  function notices(ctx, world, W, H) {
-    for (var i = 0; i < world.notifications.length; i++) {
-      var n = world.notifications[i];
-      var a = Math.min(1, (n.life - n.t) * 2, n.t * 5);
-      ctx.globalAlpha = U.clamp(a, 0, 1);
-      text(ctx, n.text, W * 0.5, H - 168 - i * 26, 14, n.color, 'bold', 'center');
-      ctx.globalAlpha = 1;
-    }
-    if (world.banner) {
-      var b = world.banner;
-      var bi = Math.min(1, b.t * 3), bo = Math.min(1, (b.life - b.t) * 2);
-      ctx.globalAlpha = Math.min(bi, bo);
-      panel(ctx, W * 0.5 - 235, 96, 470, 88, 0.86);
-      text(ctx, b.title, W * 0.5, 112, 28, C.gold, 'bold', 'center');
-      text(ctx, b.sub, W * 0.5, 150, 15, C.hud, 'bold', 'center');
-      ctx.globalAlpha = 1;
-    }
-  }
-
-  function draw(ctx, world) {
-    var W = SB.view.w, H = SB.view.h;
-    if (world.state === 'start') return;
-    ctx.save();
-    ctx.setTransform(SB.view.dpr, 0, 0, SB.view.dpr, 0, 0);
-    clockPanel(ctx, world, W);
-    missionPanel(ctx, world);
-    wanted(ctx, world, W);
-    vitals(ctx, world, W, H);
-    speedo(ctx, world, W, H);
-    notices(ctx, world, W, H);
-    text(ctx, 'WASD MOVE   E CAR   CLICK SHOOT   TAB MAP   C CONTROLS   ESC PAUSE',
-      W * 0.5, H - 24, 10, 'rgba(255,255,255,0.5)', 'normal', 'center');
-    ctx.restore();
-  }
-
-  SB.HUD = { draw: draw, panel: panel, text: text, star: star };
-})(window.SB = window.SB || {});
+  SB.HUD = HUD;
+})();

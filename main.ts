@@ -6,52 +6,62 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const out = resolve(here, process.env.MAKEFUN_OUTPUT_DIR || '/output');
-const SHOT_MAX_BYTES = 262144;
 
-function screenshotManifest(dir: string) {
-  const shots = readdirSync(dir, { withFileTypes: true })
-    .filter((e) => e.isFile() && !e.name.startsWith('.'))
-    .map((e) => ({ name: e.name, bytes: statSync(join(dir, e.name)).size }))
-    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-  if (shots.length < 3 || shots.length > 4) {
-    throw new Error(`[solara-bay] screenshots/: expected 3-4 images, found ${shots.length}`);
-  }
-  for (const shot of shots) {
-    if (shot.bytes > SHOT_MAX_BYTES) {
-      throw new Error(`[solara-bay] screenshots/${shot.name}: ${shot.bytes} bytes exceeds ${SHOT_MAX_BYTES}`);
-    }
-  }
-  return shots.map((s) => `${s.name}=${s.bytes}B`).join('  ');
-}
-
-mkdirSync(out, { recursive: true });
-
+// Screenshots are checked in; refreshing them is best-effort so packaging also
+// works on machines without a browser.
+const shots = join(here, 'shots.mjs');
 try {
-  if (existsSync(join(here, 'shots.mjs')) && process.env.MAKEFUN_SKIP_SHOTS !== '1') {
-    const result = spawnSync(process.execPath, [join(here, 'shots.mjs')], {
+  if (existsSync(shots) && process.env.MAKEFUN_SKIP_SHOTS !== '1') {
+    console.log('Refreshing screenshots...');
+    const result = spawnSync(process.execPath, [shots], {
       cwd: here,
-      env: process.env,
-      stdio: 'inherit'
+      stdio: 'inherit',
+      timeout: 240000
     });
     if (result.error || result.status !== 0) {
-      const why = result.error ? result.error.message : `exit ${result.status}`;
-      console.warn(`[solara-bay] screenshot refresh failed (${why}); packaging the checked-in screenshots.`);
+      console.warn('Warning: screenshot refresh failed; using checked-in screenshots.', result.error || ('exit ' + result.status));
     }
   }
 } catch (err) {
-  console.warn(`[solara-bay] screenshot refresh failed (${err instanceof Error ? err.message : String(err)}); packaging the checked-in screenshots.`);
+  // A recorder crash must never stop the checked-in game from being packaged.
+  console.warn('Warning: screenshot refresh failed; using checked-in screenshots.', err);
 }
 
-cpSync(join(here, 'game'), join(out, 'game'), { recursive: true, force: true });
-
+mkdirSync(out, { recursive: true });
+cpSync(join(here, 'game'), join(out, 'game'), { recursive: true });
 if (existsSync(join(here, 'screenshots'))) {
-  cpSync(join(here, 'screenshots'), join(out, 'screenshots'), { recursive: true, force: true });
+  cpSync(join(here, 'screenshots'), join(out, 'screenshots'), { recursive: true });
 }
-
 if (existsSync(join(here, 'vendor'))) {
-  cpSync(join(here, 'vendor'), join(out, 'vendor'), { recursive: true, force: true });
+  cpSync(join(here, 'vendor'), join(out, 'vendor'), { recursive: true });
 }
 
-writeFileSync(join(out, 'dossier.json'), buildDossier(out, { text_max_bytes: 163840, screenshots: { max: 4, max_bytes: 262144 }, game_max_files: 993, game_max_bytes: 50331648, game_path_max_bytes: 1000 }));
-console.log('[solara-bay] screenshot manifest: ' + screenshotManifest(join(here, 'screenshots')));
-console.log('[solara-bay] packaged SOLARA BAY into ' + out);
+writeFileSync(join(out, 'dossier.json'), buildDossier(out, {
+  text_max_bytes: 163840,
+  screenshots: { max: 4, max_bytes: 262144 },
+  game_max_files: 993,
+  game_max_bytes: 50331648,
+  game_path_max_bytes: 1000
+}));
+
+// Validate the checked-in captures that were just copied into the package.
+const maxShotBytes = 262144;
+const shotDir = join(here, 'screenshots');
+const shotsOnDisk = existsSync(shotDir)
+  ? readdirSync(shotDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => ({ name: entry.name, bytes: statSync(join(shotDir, entry.name)).size }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+  : [];
+if (shotsOnDisk.length < 3 || shotsOnDisk.length > 4) {
+  throw new Error('Screenshot validation failed: expected 3-4 files in screenshots/, found ' + shotsOnDisk.length);
+}
+const oversized = shotsOnDisk.filter((shot) => shot.bytes > maxShotBytes);
+if (oversized.length) {
+  throw new Error('Screenshot validation failed: over ' + maxShotBytes + ' bytes: ' +
+    oversized.map((shot) => shot.name + ' (' + shot.bytes + ')').join(', '));
+}
+console.log('Screenshot manifest (' + shotsOnDisk.length + ' files): ' +
+  shotsOnDisk.map((shot) => shot.name + ' ' + shot.bytes + ' bytes').join(', '));
+
+console.log('Dossier written to', join(out, 'dossier.json'));

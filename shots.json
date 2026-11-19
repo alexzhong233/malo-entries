@@ -1,41 +1,33 @@
 {
+  "url": "game/index.html",
   "viewport": { "width": 1280, "height": 720 },
-  "quality": 0.86,
+  "quality": 86,
+  "minQuality": 64,
   "maxBytes": 262144,
   "scenes": [
     {
       "file": "01-solara-bay-foot.jpg",
-      "scene": "foot",
-      "settle": 600,
-      "mouse": { "x": 900, "y": 270 },
-      "hold": [{ "keys": ["KeyW"], "ms": 260 }],
-      "click": { "ms": 45 },
-      "after": 90
+      "setup": "foot-city",
+      "wait": 950,
+      "note": "On foot downtown with HUD and minimap"
     },
     {
       "file": "02-drive-traffic.jpg",
-      "scene": "drive",
-      "settle": 450,
-      "mouse": { "x": 980, "y": 340 },
-      "hold": [{ "keys": ["KeyW"], "ms": 1100 }],
-      "after": 120
+      "setup": "drive-traffic",
+      "wait": 1050,
+      "note": "Driving a stolen car among civilian traffic"
     },
     {
       "file": "03-police-chase.jpg",
-      "scene": "police",
-      "settle": 500,
-      "mouse": { "x": 780, "y": 230 },
-      "hold": [{ "keys": ["KeyW"], "ms": 900 }],
-      "after": 120
+      "setup": "police-chase",
+      "wait": 1750,
+      "note": "Four-star pursuit with cruisers and sirens"
     },
     {
       "file": "04-mission.jpg",
-      "scene": "mission",
-      "settle": 550,
-      "aimAt": "target",
-      "hold": [{ "keys": [], "ms": 120 }],
-      "click": { "ms": 40 },
-      "after": 80
+      "setup": "mission",
+      "wait": 850,
+      "note": "Sunset Run checkpoint with objective marker"
     }
   ]
 }

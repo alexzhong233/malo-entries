@@ -1,178 +1,129 @@
-(function (SB) {
+/* SOLARA BAY - world state, surfaces and collision. */
+(function () {
   'use strict';
+  const SB = (window.SB = window.SB || {});
+  const C = SB.C, U = SB.U;
+  const HASH_CELL = 165;
 
-  var CFG = SB.CFG, U = SB.U, CITY = SB.City;
+  const World = {
+    city: null,
+    grid: {},
+    time: 0,
 
-  function spawnPed(world, x, y) {
-    var rng = world.rng;
-    var colors = ['#f4d06f', '#e96f61', '#5fb2c9', '#b98bd7', '#f2f2e8', '#4f6b8a', '#78b96a'];
-    return {
-      x: x, y: y, angle: rng() * U.TAU,
-      speed: U.range(rng, 38, 66),
-      wx: x, wy: y, phase: rng() * 10,
-      shirt: U.pick(rng, colors),
-      skin: U.pick(rng, ['#8d5b3f', '#c68a62', '#e7b78d', '#5b3d30']),
-      panic: 0
-    };
-  }
+    init: function () {
+      this.city = SB.City.generate(C.SEED);
+      this.grid = {};
+      const self = this;
+      this.city.buildings.forEach(function (b) {
+        const k = self.key(b.x + b.w / 2, b.y + b.h / 2);
+        (self.grid[k] || (self.grid[k] = [])).push(b);
+      });
+    },
 
-  function newPedWaypoint(world, ped) {
-    var rng = world.rng, p = CITY.randomRoadPoint(world.city, rng);
-    var off = CFG.ROAD_W * 0.5 + CFG.SIDEWALK * 0.6;
-    if (rng() > 0.5) off = -off;
-    var x = p.x + (p.vertical ? off : 0), y = p.y + (p.vertical ? 0 : off);
-    if (!CITY.blocked(world.city, x, y, 8)) { ped.wx = x; ped.wy = y; }
-    else { ped.wx = U.clamp(ped.x + U.range(rng, -160, 160), 50, CFG.WORLD_W - 50);
-           ped.wy = U.clamp(ped.y + U.range(rng, -160, 160), 50, CFG.WORLD_H - 50); }
-  }
+    key: function (x, y) {
+      return Math.floor(x / HASH_CELL) + ',' + Math.floor(y / HASH_CELL);
+    },
 
-  function create(city, save) {
-    save = save || {};
-    var rng = U.rng(0x51a2a + Math.floor(Math.random() * 100000));
-    var spawn = save.position || CFG.LANDMARKS.spawn;
-    var world = {
-      city: city,
-      rng: rng,
-      elapsed: 0,
-      clock: CFG.START_HOUR,
-      state: 'start',
-      menuIndex: 0,
-      cash: typeof save.cash === 'number' ? save.cash : 350,
-      wanted: 0,
-      heat: 0,
-      seenTimer: 0,
-      lostTimer: 0,
-      lastCrime: '',
-      player: SB.Player.create(spawn.x, spawn.y),
-      camera: { x: spawn.x, y: spawn.y, zoom: CFG.CAMERA.ZOOM, shake: 0, shakeX: 0, shakeY: 0 },
-      traffic: [], police: [], officers: [], bullets: [], peds: [], targets: [],
-      mission: null,
-      missionIndex: typeof save.missionIndex === 'number' ? U.clamp(save.missionIndex, 0, 6) : 0,
-      completed: save.completed ? save.completed.slice() : [false, false, false, false, false, false, false],
-      notifications: [],
-      banner: null,
-      dialog: null,
-      missionPrompt: 0,
-      saveTimer: 0,
-      roadblockTimer: 26,
-      frame: 0,
-      stats: { stolen: 0, shots: 0, distance: 0, jobs: 0 },
-      headlights: false
-    };
-    for (var i = 0; i < 85; i++) {
-      var rp = CITY.randomRoadPoint(city, rng);
-      var off = CFG.ROAD_W * 0.5 + 10;
-      var px = rp.x + (rp.vertical ? off : 0), py = rp.y + (rp.vertical ? 0 : off);
-      if (!CITY.blocked(city, px, py, 9)) world.peds.push(spawnPed(world, px, py));
-    }
-    return world;
-  }
+    shore: function (y) {
+      return C.SHORE_BASE + 26 * Math.sin(y / 430) + 14 * Math.sin(y / 137);
+    },
 
-  function sunLevel(world) {
-    var h = world.clock % 24;
-    var t = (h - 5.5) / 14.0;
-    return U.clamp(Math.sin(t * Math.PI), 0, 1);
-  }
+    isWater: function (x, y) {
+      if (x < this.shore(y)) return true;
+      return y > C.INLET_Y0 && y < C.INLET_Y1 && x < C.INLET_X;
+    },
 
-  function update(world, dt) {
-    world.elapsed += dt;
-    world.clock = (CFG.START_HOUR + world.elapsed / CFG.DAY_LENGTH * 24) % 24;
-    if (world.camera.shake > 0) world.camera.shake = Math.max(0, world.camera.shake - dt * 24);
-
-    var i, n;
-    for (i = 0; i < world.notifications.length; i++) {
-      world.notifications[i].t += dt;
-    }
-    world.notifications = world.notifications.filter(function (m) { return m.t < m.life; });
-    if (world.banner) {
-      world.banner.t += dt;
-      if (world.banner.t > world.banner.life) world.banner = null;
-    }
-    if (world.dialog) {
-      world.dialog.t += dt;
-      if (world.dialog.t > world.dialog.life) world.dialog = null;
-    }
-
-    // Pedestrians scatter from gunfire and high-speed chases.
-    var p = world.player;
-    for (i = 0; i < world.peds.length; i++) {
-      var ped = world.peds[i];
-      if (U.dist2(ped.x, ped.y, world.camera.x, world.camera.y) > 1700 * 1700) continue;
-      var d = U.dist(ped.x, ped.y, p.x, p.y);
-      if (d < 170 && (world.wanted > 0 || p.shootFlash > 0)) ped.panic = 3.5;
-      if (ped.panic > 0) {
-        ped.panic -= dt;
-        ped.speed = 128;
-      } else ped.speed = U.lerp(ped.speed, 52, dt * 2);
-      if (U.dist2(ped.x, ped.y, ped.wx, ped.wy) < 20 * 20 || world.rng() < dt * 0.05) {
-        newPedWaypoint(world, ped);
+    onPier: function (x, y, pad) {
+      pad = pad || 0;
+      const piers = this.city.piers;
+      for (let i = 0; i < piers.length; i++) {
+        const p = piers[i];
+        if (x > p.x - pad && x < p.x + p.w + pad && y > p.y - pad && y < p.y + p.h + pad) return true;
       }
-      var a = Math.atan2(ped.wy - ped.y, ped.wx - ped.x);
-      ped.angle = U.angleLerp(ped.angle, a, Math.min(1, dt * 7));
-      var vx = Math.cos(ped.angle) * ped.speed, vy = Math.sin(ped.angle) * ped.speed;
-      if (!CITY.blocked(world.city, ped.x + vx * dt, ped.y + vy * dt, 8)) {
-        ped.x += vx * dt; ped.y += vy * dt; ped.phase += dt * ped.speed * 0.09;
-      } else newPedWaypoint(world, ped);
-    }
-    // Keep the population from drifting into the sea or inside a mall.
-    for (i = world.peds.length - 1; i >= 0; i--) {
-      if (CITY.blocked(world.city, world.peds[i].x, world.peds[i].y, 5)) world.peds.splice(i, 1);
-    }
-    while (world.peds.length < 70) {
-      var rp = CITY.randomRoadPoint(world.city, world.rng);
-      var off2 = CFG.ROAD_W * 0.5 + 12;
-      var qx = rp.x + (rp.vertical ? off2 : 0), qy = rp.y + (rp.vertical ? 0 : off2);
-      if (!CITY.blocked(world.city, qx, qy, 9)) world.peds.push(spawnPed(world, qx, qy));
-    }
-  }
+      return false;
+    },
 
-  // Axis-separated circle collision gives a nice sliding feel against walls.
-  function move(world, ent, dx, dy, r) {
-    var hit = false;
-    if (dx !== 0 && !CITY.blocked(world.city, ent.x + dx, ent.y, r)) ent.x += dx;
-    else if (dx !== 0) hit = true;
-    if (dy !== 0 && !CITY.blocked(world.city, ent.x, ent.y + dy, r)) ent.y += dy;
-    else if (dy !== 0) hit = true;
-    return hit;
-  }
-
-  function clearSpot(world, x, y, r) {
-    if (!CITY.blocked(world.city, x, y, r)) return { x: x, y: y };
-    for (var ring = 1; ring < 14; ring++) {
-      for (var a = 0; a < 12; a++) {
-        var ang = a / 12 * U.TAU;
-        var nx = x + Math.cos(ang) * ring * 34, ny = y + Math.sin(ang) * ring * 34;
-        if (!CITY.blocked(world.city, nx, ny, r)) return { x: nx, y: ny };
+    nearbyBuildings: function (x, y) {
+      const gx = Math.floor(x / HASH_CELL), gy = Math.floor(y / HASH_CELL);
+      const out = [];
+      for (let i = -1; i <= 1; i++) {
+        for (let j = -1; j <= 1; j++) {
+          const list = this.grid[(gx + i) + ',' + (gy + j)];
+          if (list) out.push.apply(out, list);
+        }
       }
+      return out;
+    },
+
+    solid: function (x, y, r) {
+      if (x < r || y < r || x > C.WORLD - r || y > C.WORLD - r) return true;
+      if (this.isWater(x, y) && !this.onPier(x, y, -r * 0.5)) return true;
+      const list = this.nearbyBuildings(x, y);
+      for (let i = 0; i < list.length; i++) {
+        if (U.circleRect(x, y, r, list[i])) return true;
+      }
+      return false;
+    },
+
+    // Axis-separated movement with substeps keeps fast cars from tunnelling.
+    move: function (ent, dx, dy, r) {
+      const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 7));
+      let hitX = false, hitY = false;
+      for (let s = 0; s < steps; s++) {
+        const sx = dx / steps, sy = dy / steps;
+        if (sx && !this.solid(ent.x + sx, ent.y, r)) ent.x += sx; else if (sx) hitX = true;
+        if (sy && !this.solid(ent.x, ent.y + sy, r)) ent.y += sy; else if (sy) hitY = true;
+      }
+      return { x: hitX, y: hitY };
+    },
+
+    surface: function (x, y) {
+      if (this.isWater(x, y)) return 'water';
+      if (this.onPier(x, y)) return 'pier';
+      if (x < C.SAND_END && y < C.INLET_Y0) return 'sand';
+      const p = this.city.park;
+      if (U.pointRect(x, y, p)) return 'park';
+      const rx = this.nearestRoadLine(x, C.ROAD_X);
+      const ry = this.nearestRoadLine(y, C.ROAD_Y);
+      if (Math.abs(rx.d) < C.HALF || Math.abs(ry.d) < C.HALF) return 'road';
+      if (Math.abs(rx.d) < C.HALF + 12 || Math.abs(ry.d) < C.HALF + 12) return 'sidewalk';
+      return 'lot';
+    },
+
+    nearestRoadLine: function (v, lines) {
+      let best = lines[0], bd = Math.abs(v - best);
+      for (let i = 1; i < lines.length; i++) {
+        const d = Math.abs(v - lines[i]);
+        if (d < bd) { bd = d; best = lines[i]; }
+      }
+      return { v: best, d: v - best };
+    },
+
+    nearestRoad: function (x, y) {
+      const nx = this.nearestRoadLine(x, C.ROAD_X);
+      const ny = this.nearestRoadLine(y, C.ROAD_Y);
+      if (Math.abs(nx.d) < Math.abs(ny.d)) return { x: nx.v, y: y, axis: 'v', d: Math.abs(nx.d) };
+      return { x: x, y: ny.v, axis: 'h', d: Math.abs(ny.d) };
+    },
+
+    lineClear: function (x1, y1, x2, y2) {
+      const d = U.dist(x1, y1, x2, y2);
+      const steps = Math.ceil(d / 28);
+      for (let i = 1; i < steps; i++) {
+        const t = i / steps;
+        const x = U.lerp(x1, x2, t), y = U.lerp(y1, y2, t);
+        const list = this.nearbyBuildings(x, y);
+        for (let j = 0; j < list.length; j++) {
+          if (U.pointRect(x, y, list[j])) return false;
+        }
+      }
+      return true;
+    },
+
+    roadPoint: function (ix, iy, ox, oy) {
+      return { x: C.ROAD_X[ix] + (ox || 0), y: C.ROAD_Y[iy] + (oy || 0) };
     }
-    return { x: CFG.LANDMARKS.spawn.x, y: CFG.LANDMARKS.spawn.y };
-  }
-
-  function notify(world, text, color, life) {
-    world.notifications.push({ text: text, color: color || CFG.COLORS.hud, t: 0, life: life || 3.2 });
-    if (world.notifications.length > 5) world.notifications.shift();
-  }
-
-  function say(world, speaker, text, life) {
-    world.dialog = { speaker: speaker, text: text, t: 0, life: life || 6.5 };
-  }
-
-  function revive(world) {
-    var spot = clearSpot(world, CFG.LANDMARKS.spawn.x, CFG.LANDMARKS.spawn.y, 20);
-    var p = world.player;
-    p.health = CFG.PLAYER.MAX_HEALTH;
-    p.alive = true;
-    p.x = spot.x; p.y = spot.y; p.car = null;
-    p.vx = 0; p.vy = 0;
-    world.wanted = 0; world.heat = 0;
-    world.police.length = 0; world.officers.length = 0;
-    world.state = 'playing';
-    world.camera.x = p.x; world.camera.y = p.y;
-    notify(world, 'You wake up on the boardwalk. Keep your head down.', '#ffd45e', 4.5);
-  }
-
-  SB.World = {
-    create: create, update: update, move: move, sunLevel: sunLevel, clearSpot: clearSpot,
-    notify: notify, say: say, revive: revive, spawnPed: spawnPed
   };
-})(window.SB = window.SB || {});
+
+  SB.World = World;
+})();

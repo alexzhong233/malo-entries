@@ -1,126 +1,127 @@
-(function (SB) {
+/* SOLARA BAY - corner minimap with roads, water, player and objective pulse. */
+(function () {
   'use strict';
+  const SB = (window.SB = window.SB || {});
+  const C = SB.C, U = SB.U;
 
-  var U = SB.U, C = SB.CFG.COLORS, CFG = SB.CFG;
+  const Minimap = {
+    zoom: false,
+    size: 196,
 
-  function draw(ctx, world) {
-    var W = SB.view.w, H = SB.view.h;
-    if (world.state === 'start') return;
-    var R = 88, cx = W - 120, cy = 158;
-    var zoom = world.mapZoom || 1;
-    var span = 1050 / zoom;
-    var p = world.player;
-    var mx = p.x, my = p.y;
-    var sx = R / span;
+    toggle: function () { this.zoom = !this.zoom; },
 
-    function tx(x) { return cx + (x - mx) * sx; }
-    function ty(y) { return cy + (y - my) * sx; }
+    draw: function (ctx, W, H, time) {
+      const size = this.size;
+      const x0 = 22, y0 = H - size - 34;
+      const cx = x0 + size / 2, cy = y0 + size / 2;
+      const scale = this.zoom ? 0.105 : 0.052;
+      const p = SB.Player.state;
+      const px = p.inCar ? p.inCar.x : p.x;
+      const py = p.inCar ? p.inCar.y : p.y;
+      const left = px - size / 2 / scale, right = px + size / 2 / scale;
+      const top = py - size / 2 / scale, bottom = py + size / 2 / scale;
 
-    ctx.save();
-    ctx.setTransform(SB.view.dpr, 0, 0, SB.view.dpr, 0, 0);
-    ctx.fillStyle = 'rgba(13,24,34,0.86)';
-    ctx.beginPath(); ctx.arc(cx, cy, R + 9, 0, U.TAU); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,226,160,0.55)'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(cx, cy, R + 5, 0, U.TAU); ctx.stroke();
+      ctx.save();
+      ctx.fillStyle = 'rgba(20,24,34,0.84)';
+      ctx.fillRect(x0 - 5, y0 - 5, size + 10, size + 10);
+      ctx.beginPath(); ctx.rect(x0, y0, size, size); ctx.clip();
+      ctx.translate(cx, cy);
+      ctx.scale(scale, scale);
+      ctx.translate(-px, -py);
 
-    ctx.save();
-    ctx.beginPath(); ctx.arc(cx, cy, R, 0, U.TAU); ctx.clip();
+      // Ocean and shoreline.
+      ctx.fillStyle = '#0e9fb4';
+      ctx.fillRect(left, top, right - left, bottom - top);
+      ctx.fillStyle = '#e7cd94';
+      ctx.beginPath();
+      ctx.moveTo(C.WORLD + 50, top);
+      for (let y = top; y <= bottom + 40; y += 40) ctx.lineTo(SB.World.shore(y), y);
+      ctx.lineTo(C.WORLD + 50, bottom + 40);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#0e9fb4';
+      ctx.fillRect(left, C.INLET_Y0, C.INLET_X - left, C.INLET_Y1 - C.INLET_Y0);
+      ctx.fillStyle = 'rgba(255,255,240,0.55)';
+      ctx.fillRect(C.INLET_X, C.INLET_Y0, 5, C.INLET_Y1 - C.INLET_Y0);
 
-    // Turquoise bay and the shoreline.
-    ctx.fillStyle = C.waterDeep;
-    ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
-    ctx.fillStyle = '#3fc9c8';
-    ctx.fillRect(cx - R, cy - R, R * 2, R * 2 * 0.22);
-    ctx.fillStyle = C.sand;
-    ctx.beginPath();
-    var y0 = my - span - 60, y1 = my + span + 60;
-    ctx.moveTo(tx(SB.City.shorelineAt(y0)), ty(y0));
-    for (var yy = y0; yy <= y1; yy += 22) ctx.lineTo(tx(SB.City.shorelineAt(yy)), ty(yy));
-    ctx.lineTo(cx + R + 20, cy + R + 20);
-    ctx.lineTo(tx(SB.City.shorelineAt(y1)), cy + R + 20);
-    ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    for (yy = y0; yy <= y1; yy += 22) {
-      var px = tx(SB.City.shorelineAt(yy)), py = ty(yy);
-      if (yy === y0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      // Park and ponds.
+      const pk = SB.World.city.park;
+      ctx.fillStyle = '#4f914b'; ctx.fillRect(pk.x, pk.y, pk.w, pk.h);
+      ctx.fillStyle = '#2aa9bd';
+      SB.World.city.ponds.forEach(function (pond) {
+        ctx.beginPath(); ctx.ellipse(pond.x, pond.y, pond.rx, pond.ry, 0, 0, U.TAU); ctx.fill();
+      });
+
+      // Sidewalk blocks, then road ribbons.
+      ctx.fillStyle = 'rgba(220,205,175,0.55)';
+      for (let i = 0; i < C.ROAD_X.length - 1; i++) {
+        for (let j = 0; j < C.ROAD_Y.length - 1; j++) {
+          const bx = C.ROAD_X[i] + C.HALF, by = C.ROAD_Y[j] + C.HALF;
+          if (bx > right || by > bottom || bx + C.GRID < left || by + C.GRID < top) continue;
+          ctx.fillRect(bx, by, C.GRID - C.ROAD_W, C.GRID - C.ROAD_W);
+        }
+      }
+      ctx.strokeStyle = '#4d5560'; ctx.lineWidth = C.ROAD_W;
+      for (let i = 0; i < C.ROAD_X.length; i++) {
+        const x = C.ROAD_X[i];
+        if (x < left - 50 || x > right + 50) continue;
+        ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke();
+      }
+      for (let j = 0; j < C.ROAD_Y.length; j++) {
+        const y = C.ROAD_Y[j];
+        if (y < top - 50 || y > bottom + 50) continue;
+        ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(255,225,140,0.55)'; ctx.lineWidth = 1.5;
+      ctx.setLineDash([9, 13]);
+      for (let i = 0; i < C.ROAD_X.length; i++) {
+        const x = C.ROAD_X[i];
+        if (x < left || x > right) continue;
+        ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke();
+      }
+      ctx.setLineDash([]);
+
+      // Vehicles and police.
+      const cars = SB.Vehicles.list;
+      for (let i = 0; i < cars.length; i++) {
+        const v = cars[i];
+        if (v.x < left || v.x > right || v.y < top || v.y > bottom) continue;
+        ctx.fillStyle = v.kind === 'police' ? '#4aa8ff' : '#fff1cc';
+        ctx.fillRect(v.x - 3, v.y - 2, 6, 4);
+      }
+
+      // Objective, clamped to the rim when off-map.
+      const obj = SB.Missions.objective();
+      if (obj) {
+        const ox = U.clamp(obj.x, left + 12, right - 12);
+        const oy = U.clamp(obj.y, top + 12, bottom - 12);
+        const pulse = 8 + Math.sin(time * 5) * 2.5;
+        ctx.fillStyle = 'rgba(255,205,70,0.35)';
+        ctx.beginPath(); ctx.arc(ox, oy, pulse * 2, 0, U.TAU); ctx.fill();
+        ctx.fillStyle = '#ffd34f';
+        ctx.beginPath();
+        ctx.moveTo(ox, oy - pulse); ctx.lineTo(ox + pulse, oy);
+        ctx.lineTo(ox, oy + pulse); ctx.lineTo(ox - pulse, oy);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+
+      // Frame, north marker and player arrow (screen space).
+      ctx.strokeStyle = '#ffe0a0'; ctx.lineWidth = 2;
+      ctx.strokeRect(x0 - 4, y0 - 4, size + 8, size + 8);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(p.inCar ? p.inCar.a : p.aim);
+      ctx.fillStyle = '#fff6df';
+      ctx.strokeStyle = '#25303a'; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(9, 0); ctx.lineTo(-7, -7); ctx.lineTo(-4, 0); ctx.lineTo(-7, 7);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.restore();
+      ctx.font = 'bold 10px Arial'; ctx.fillStyle = '#ffe0a0'; ctx.textAlign = 'center';
+      ctx.fillText('N', cx, y0 + 11);
+      ctx.fillText(this.zoom ? 'MAP +' : 'MAP', cx, y0 + size - 6);
     }
-    ctx.stroke();
+  };
 
-    // Park.
-    var park = world.city.park;
-    ctx.fillStyle = C.grassDark;
-    ctx.fillRect(tx(park.x), ty(park.y), park.w * sx, park.h * sx);
-
-    // Building footprints give the map its city texture.
-    var list = SB.City.buildingsNear(world.city, mx, my, span + CFG.BLOCK_CELL);
-    ctx.fillStyle = 'rgba(92,82,72,0.62)';
-    for (var i = 0; i < list.length; i++) {
-      var b = list[i];
-      if (b.x + b.w < mx - span || b.x > mx + span || b.y + b.h < my - span || b.y > my + span) continue;
-      ctx.fillRect(tx(b.x), ty(b.y), Math.max(1, b.w * sx), Math.max(1, b.h * sx));
-    }
-
-    // Street grid.
-    ctx.strokeStyle = 'rgba(245,241,220,0.75)'; ctx.lineWidth = Math.max(1.4, CFG.ROAD_W * sx * 0.55);
-    ctx.beginPath();
-    for (i = 0; i < world.city.roadXs.length; i++) {
-      var rx = world.city.roadXs[i];
-      if (Math.abs(rx - mx) > span + 100) continue;
-      ctx.moveTo(tx(rx), cy - R); ctx.lineTo(tx(rx), cy + R);
-    }
-    for (i = 0; i < world.city.roadYs.length; i++) {
-      var ry = world.city.roadYs[i];
-      if (Math.abs(ry - my) > span + 100) continue;
-      ctx.moveTo(cx - R, ty(ry)); ctx.lineTo(cx + R, ty(ry));
-    }
-    ctx.stroke();
-
-    // Traffic and police blips.
-    for (i = 0; i < world.traffic.length; i++) {
-      var tr = world.traffic[i];
-      if (Math.abs(tr.x - mx) > span || Math.abs(tr.y - my) > span) continue;
-      ctx.fillStyle = tr.parked ? 'rgba(255,255,255,0.45)' : '#fff8dc';
-      ctx.fillRect(tx(tr.x) - 1.5, ty(tr.y) - 1.5, 3, 3);
-    }
-    for (i = 0; i < world.police.length; i++) {
-      var cop = world.police[i];
-      if (cop.wrecked || Math.abs(cop.x - mx) > span || Math.abs(cop.y - my) > span) continue;
-      var flash = Math.floor(world.elapsed * 6) % 2;
-      ctx.fillStyle = flash ? '#ff4d43' : '#4285ff';
-      ctx.beginPath(); ctx.arc(tx(cop.x), ty(cop.y), 3.2, 0, U.TAU); ctx.fill();
-    }
-
-    // Objective, clamped to the edge of the map when it is far away.
-    var mk = SB.Missions.marker(world);
-    if (mk) {
-      var dx = mk.x - mx, dy = mk.y - my, dm = Math.hypot(dx, dy);
-      var scale = dm > span - 20 ? (span - 20) / dm : 1;
-      var ox = cx + dx * sx * scale, oy = cy + dy * sx * scale;
-      var pulse = 0.5 + 0.5 * Math.sin(world.elapsed * 4);
-      ctx.strokeStyle = '#ffd45e'; ctx.fillStyle = 'rgba(255,212,94,' + (0.3 + pulse * 0.4) + ')';
-      ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(ox, oy, 6 + pulse * 4, 0, U.TAU); ctx.fill(); ctx.stroke();
-    }
-
-    // Player arrow.
-    var pa = p.car ? p.car.angle : p.angle;
-    ctx.save();
-    ctx.translate(cx, cy); ctx.rotate(pa + Math.PI / 2);
-    ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = '#20344c'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(6, 7); ctx.lineTo(0, 3); ctx.lineTo(-6, 7); ctx.closePath();
-    ctx.fill(); ctx.stroke();
-    ctx.restore();
-    ctx.restore();
-
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    ctx.font = 'bold 10px Arial, sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('N', cx, cy - R - 1);
-    ctx.fillStyle = 'rgba(255,226,160,0.8)';
-    ctx.fillText('TAB ' + (zoom > 1 ? 'OUT' : 'IN'), cx, cy + R + 18);
-    ctx.restore();
-  }
-
-  SB.Minimap = { draw: draw };
-})(window.SB = window.SB || {});
+  SB.Minimap = Minimap;
+})();
