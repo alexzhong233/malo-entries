@@ -88,6 +88,7 @@
     }
   ];
 
+  const FREE_ROAM = 'SOLARA BAY CLEARED  ·  Free roam  ·  TAB replays the chain';
   const PARK = { x: 662, y: 962, w: 176, h: 176 };
   const SPOTS = {
     marisol: { x: 600, y: 540 },
@@ -134,7 +135,7 @@
   JOBS.objective = function (w) {
     const m = w.mission;
     if (m.done) {
-      w.objective = 'SOLARA BAY CLEARED  ·  Free roam  ·  TAB replays the chain';
+      w.objective = FREE_ROAM;
       return;
     }
     const job = JOBS.list[m.index];
@@ -177,7 +178,7 @@
     JOBS.begin(w, true);
     if (done) {
       m.done = true;
-      w.objective = 'SOLARA BAY CLEARED  ·  Free roam  ·  TAB replays the chain';
+      w.objective = FREE_ROAM;
       SB.say(w, 'Chain complete — save restored', 'TAB to replay the story.', 3.6);
     }
   };
@@ -328,6 +329,7 @@
           m.index += 1;
           cleanupCars(w);
           JOBS.begin(w);
+          SB.save.write(w); // persist the new job, not the one that just paid out
         } else {
           m.done = true;
           SB.say(w, 'THE SOLARA BAY CHAIN IS CLOSED', 'Marisol: "We are even. For now."  ·  TAB to replay.', 5.5);

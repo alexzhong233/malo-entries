@@ -13,14 +13,16 @@
 
   SB.makeCar = function (w, x, y, angle, type, color, opts) {
     const o = opts || {};
+    const style = STYLES[type] || STYLES.sedan;
+    const health = o.health == null ? C.health : o.health;
     const car = {
       x, y, angle, vx: 0, vy: 0, throttle: 0, steer: 0, handbrake: false,
       type: type || 'sedan', color: color || u.pick(w.rng, COLORS),
-      health: o.health || C.health, maxHealth: C.health, radius: C.radius,
+      // maxHealth follows an explicit starting health, so staged cars show the right damage bar.
+      health, maxHealth: health, radius: C.radius,
       ai: o.ai || null, isCop: !!o.cop, player: !!o.player, occupied: !!o.player,
       siren: !!o.cop, drift: false, smoke: 0, dead: false, flash: 0,
-      w: STYLES[type || 'sedan'].w, h: STYLES[type || 'sedan'].h,
-      speedFactor: STYLES[type || 'sedan'].speed
+      w: style.w, h: style.h, speedFactor: style.speed
     };
     w.cars.push(car);
     if (car.isCop) w.cops.push(car);
@@ -81,8 +83,10 @@
   };
 
   SB.stepVehicles = function (w, dt) {
-    const cars = w.cars;
+    // Snapshot the list: an exploding car removes itself mid-step, which would skip its neighbour.
+    const cars = w.cars.slice();
     for (const car of cars) {
+      if (car.dead) continue;
       const before = Math.hypot(car.vx, car.vy);
       const hit = w.city.resolveCircle(car.x, car.y, car.radius);
       if (hit.hit) {
@@ -106,10 +110,12 @@
       car.flash -= dt;
     }
     // Car vs car: shove apart, trade a little momentum and dent both.
-    for (let i = 0; i < w.cars.length; i += 1) {
-      const a = w.cars[i];
-      for (let j = i + 1; j < w.cars.length; j += 1) {
-        const b = w.cars[j];
+    for (let i = 0; i < cars.length; i += 1) {
+      const a = cars[i];
+      if (a.dead) continue;
+      for (let j = i + 1; j < cars.length; j += 1) {
+        const b = cars[j];
+        if (b.dead) continue;
         const dx = b.x - a.x, dy = b.y - a.y;
         const d = Math.hypot(dx, dy);
         const min = a.radius + b.radius;
@@ -134,7 +140,8 @@
       }
     }
     // Car vs ped.
-    for (const car of w.cars) {
+    for (const car of cars) {
+      if (car.dead) continue;
       const speed = Math.hypot(car.vx, car.vy);
       if (speed < 26) continue;
       for (const ped of w.peds) {

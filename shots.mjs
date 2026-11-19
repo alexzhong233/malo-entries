@@ -33,8 +33,9 @@ const server = createServer((request, response) => {
   const file = resolve(join(gameDir, normalize(pathname)));
   if (file !== gameDir && !file.startsWith(gameDir + sep)) { response.writeHead(403).end(); return; }
   try {
-    const size = statSync(file).size;
-    if (!statSync(file).isFile()) throw new Error('not a file');
+    const stats = statSync(file);
+    if (!stats.isFile()) throw new Error('not a file');
+    const size = stats.size;
     response.writeHead(200, {
       'content-type': MIME[extname(file).toLowerCase()] || 'application/octet-stream',
       'content-length': size, 'cache-control': 'no-store'
@@ -116,8 +117,7 @@ try {
     } catch (err) {
       const debug = await page.evaluate(() => ({
         screen: window.__sbWorld && window.__sbWorld.screen,
-        time: window.__sbWorld && window.__sbWorld.time,
-        errors: window.__shotErrors || []
+        time: window.__sbWorld && window.__sbWorld.time
       }));
       throw new Error(`${shot.name}: __shotReady timeout ${JSON.stringify(debug)}; ${errors.join(' | ')}`);
     }
@@ -352,9 +352,10 @@ console.log(`systems: audio=${smoke.audio.state} effects=ok police=${smoke.polic
 console.log(`perf: ${perf.fps} fps average, p95 frame ${perf.p95ms} ms with ${results[1].state.cars} cars / ${results[1].state.peds} peds staged`);
 
 if (readdirSync(shotDir).length !== 4) throw new Error('screenshots/ must hold exactly four files');
-writeFileSync(join(here, 'shots.json'), JSON.stringify(results.map((r) => ({
-  name: r.name, query: `?shot=${r.mode}&seed=${SHOTS.find((s) => s.name === r.name).seed}`
-})), null, 2) + '\n');
+writeFileSync(join(here, 'shots.json'), JSON.stringify(results.map((r) => {
+  const shot = SHOTS.find((s) => s.name === r.name);
+  return { name: r.name, mode: r.mode, seed: shot.seed, query: `?shot=${r.mode}&seed=${shot.seed}` };
+}), null, 2) + '\n');
 console.log('shots.json updated; exactly four screenshots verified.');
 } finally {
   await context.close();

@@ -157,6 +157,12 @@
       if (y === W.minY) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
     ctx.stroke();
+    // Damp sand just above the tide line reads as a soft band instead of a hard colour change.
+    const wet = ctx.createLinearGradient(W.waterX, 0, W.waterX + 28, 0);
+    wet.addColorStop(0, 'rgba(96,150,140,0.30)');
+    wet.addColorStop(1, 'rgba(96,150,140,0)');
+    ctx.fillStyle = wet;
+    ctx.fillRect(W.waterX, W.minY, 28, W.maxY - W.minY);
     ctx.fillStyle = P.sandDark;
     for (const prop of city.props) ctx.fillRect(prop.x, prop.y, prop.r + 1, prop.r);
 

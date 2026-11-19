@@ -49,7 +49,7 @@
       if (car) {
         p.hotwireTarget = car;
         p.hotwire = 0;
-        SB.say(w, c_label(car), 'Hold E to hotwire', 1.8);
+        SB.say(w, hotwireLabel(car), 'Hold E to hotwire', 1.8);
       }
     }
     if (p.hotwireTarget) {
@@ -69,12 +69,13 @@
     }
   };
 
-  function c_label(car) {
+  function hotwireLabel(car) {
     return car.isCop ? 'POLICE CAR — HOTWIRE' : 'Hotwiring ' + car.type.toUpperCase();
   }
 
   SB.shoot = function (w, spread) {
     const p = w.player;
+    if (p.ammo <= 0) return; // keep the smoke tests and rapid clicks honest
     p.fire = P.fireRate;
     p.muzzle = 0.08;
     p.ammo -= 1;

@@ -4,7 +4,7 @@
   'use strict';
   const F = SB.FIELD, P = SB.PALETTE, u = SB.u;
 
-  const SC = SB.screens = { hit: [], selected: 0, prev: 'start' };
+  const SC = SB.screens = { hit: [], selected: 0, hover: -1, prev: 'start' };
 
   function text(ctx, value, x, y, size, color, align, weight) {
     ctx.font = (weight || '') + ' ' + size + 'px ' + SB.FONT;
@@ -39,12 +39,12 @@
       const y = top + i * 54;
       const box = { x: F.width / 2 - 190, y: y - 32, w: 380, h: 46, action: list[i].action };
       SC.hit.push(box);
-      const on = i === SC.selected;
-      ctx.fillStyle = on ? 'rgba(255,200,87,0.94)' : 'rgba(18,32,39,0.78)';
+      const on = i === SC.selected, hovered = i === SC.hover && !on;
+      ctx.fillStyle = on ? 'rgba(255,200,87,0.94)' : hovered ? 'rgba(255,200,87,0.55)' : 'rgba(18,32,39,0.78)';
       ctx.fillRect(box.x, box.y, box.w, box.h);
-      ctx.strokeStyle = on ? '#fff0c9' : 'rgba(255,240,210,0.28)';
+      ctx.strokeStyle = on || hovered ? '#fff0c9' : 'rgba(255,240,210,0.28)';
       ctx.lineWidth = 1.5; ctx.strokeRect(box.x + 1, box.y + 1, box.w - 2, box.h - 2);
-      text(ctx, list[i].label, F.width / 2, y - 2, 21, on ? '#1a2529' : P.text, 'center', 'bold');
+      text(ctx, list[i].label, F.width / 2, y - 2, 21, on || hovered ? '#1a2529' : P.text, 'center', 'bold');
     }
   }
 
@@ -53,6 +53,7 @@
 
   SC.update = function (w, input) {
     const screen = w.screen;
+    SC.hover = -1;
     if (screen === 'busted' || screen === 'wasted') {
       if (input.consume('Enter') || input.consume('Space') || input.mouse.click) return 'respawn';
       return null;
@@ -62,16 +63,17 @@
       return null;
     }
     const list = items(w);
+    // One hit test per frame drives both the hover highlight and the click action.
+    for (let i = 0; i < SC.hit.length; i += 1) {
+      const box = SC.hit[i];
+      if (input.mouse.x >= box.x && input.mouse.x <= box.x + box.w &&
+        input.mouse.y >= box.y && input.mouse.y <= box.y + box.h) { SC.hover = i; break; }
+    }
     if (input.consume('ArrowUp') || input.consume('KeyW')) SC.selected = (SC.selected + list.length - 1) % list.length;
     if (input.consume('ArrowDown') || input.consume('KeyS')) SC.selected = (SC.selected + 1) % list.length;
-    if (input.mouse.click) {
-      for (const box of SC.hit) {
-        if (input.mouse.x >= box.x && input.mouse.x <= box.x + box.w &&
-          input.mouse.y >= box.y && input.mouse.y <= box.y + box.h) {
-          SC.selected = list.findIndex(function (item) { return item.action === box.action; });
-          return box.action;
-        }
-      }
+    if (input.mouse.click && SC.hover >= 0) {
+      SC.selected = SC.hover;
+      return list[SC.hover].action;
     }
     if (input.consume('Enter') || input.consume('Space')) return list[SC.selected].action;
     return null;

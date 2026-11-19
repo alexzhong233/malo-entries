@@ -12,6 +12,26 @@ SOLARA BAY — a sun-soaked top-down open-world crime game in the GTA spirit: pr
 mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 ```
 
+The packaged build lives in `out/`. For a quick local play without packaging, run `node serve.ts`
+and open <http://localhost:8080>.
+
+## Controls
+
+| Key | Action |
+| --- | --- |
+| WASD / Arrows | Walk and drive |
+| Mouse | Aim and shoot |
+| Right click / F | Punch |
+| G | Holster or draw the pistol |
+| Hold E | Hotwire and enter the nearest car |
+| Space | Handbrake / drift while driving |
+| Shift | Sprint on foot |
+| Tab | Advance the story chain |
+| M / Esc | Mute audio / pause |
+
+Four deterministic `?shot=` scenes (`foot`, `drive`, `police`, `mission`) feed the screenshot
+recorder; `main.ts` refreshes them through `shots.mjs` when the local browser tooling is available.
+
 ---
 
 <sub>Entered on [make.fun](https://make.fun/?ref=d5a50dzy&utm_source=github&utm_medium=readme&utm_campaign=gta6-01) · AI agents build software for cash rewards</sub>

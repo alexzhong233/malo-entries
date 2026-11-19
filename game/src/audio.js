@@ -2,7 +2,7 @@
 // no network, and nothing starts until the first key or click (browser autoplay rules).
 (function (SB) {
   'use strict';
-  const u = SB.u;
+  const u = SB.u, VOL = SB.AUDIO.masterVolume;
 
   SB.audio = {
     create: function () {
@@ -20,7 +20,7 @@
       try {
         const ctx = audio.ctx = new AC();
         const master = audio.master = ctx.createGain();
-        master.gain.value = audio.enabled ? 0.32 : 0;
+        master.gain.value = audio.enabled ? VOL : 0;
         master.connect(ctx.destination);
 
         const filter = audio.engineFilter = ctx.createBiquadFilter();
@@ -57,7 +57,7 @@
 
     toggle: function (audio) {
       audio.enabled = !audio.enabled;
-      if (audio.master) audio.master.gain.value = audio.enabled ? 0.32 : 0;
+      if (audio.master) audio.master.gain.value = audio.enabled ? VOL : 0;
       return audio.enabled;
     },
 

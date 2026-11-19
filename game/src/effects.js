@@ -87,6 +87,13 @@
       ctx.globalAlpha = Math.max(0, p.life / p.max);
       ctx.fillStyle = p.color;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+      // A small additive core makes sparks and fire read as light, not just coloured dots.
+      if (p.kind === 'fire' || p.kind === 'spark') {
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = '#fff8dc';
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 0.45, 0, Math.PI * 2); ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+      }
     }
     ctx.globalAlpha = 1;
   };

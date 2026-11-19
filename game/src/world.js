@@ -73,6 +73,8 @@
     p.hotwire = 0; p.hotwireTarget = null; p.hurt = 0;
     w.wanted = 0; w.unseen = 0; w.arrest = 0; w.copTimer = 10;
     w.bullets.length = 0;
+    // A clean slate: old gunshot noise must not panic fresh pedestrians on the respawn street.
+    w.lastGunshot = -99; w.lastExplosion = -99;
     w.camera.x = p.x; w.camera.y = p.y;
     w.screen = 'play';
     SB.say(w, 'Back on the street.', 'Watch your step out there.', 3);
@@ -105,7 +107,7 @@
   };
 
   SB.addPickup = function (w, x, y, kind, value) {
-    if (w.pickups.length > 40) w.pickups.shift();
+    if (w.pickups.length >= 40) w.pickups.shift();
     w.pickups.push({ x, y, kind, value, life: 40, bob: w.rng() * 6 });
   };
 

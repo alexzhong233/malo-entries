@@ -1,9 +1,9 @@
-// SOLARA BAY save system: a small, validated localStorage record of theplayer's life in the city.
+// SOLARA BAY save system: a small, validated localStorage record of the player's life in the city.
 // Everything is wrapped in try/catch so private browsing, disabled storage or a corrupt record
 // can never stop the game from running. save.js is loaded before the systems that call it.
 (function (SB) {
   'use strict';
-  const u = SB.u, P = SB.PLAYER, KEY = SB.SAVE_KEY;
+  const u = SB.u, P = SB.PLAYER, KEY = SB.SAVE_KEY, SAVE_VERSION = 1;
 
   function storage() {
     try { return window.localStorage; } catch (err) { return null; }
@@ -18,7 +18,7 @@
 
   SAVE.capture = function (w) {
     return {
-      version: 1,
+      version: SAVE_VERSION,
       seed: w.seed,
       x: Math.round(w.player.x), y: Math.round(w.player.y),
       money: Math.round(w.money),
@@ -52,7 +52,7 @@
     if (!store) return null;
     try {
       const data = JSON.parse(store.getItem(KEY) || 'null');
-      if (!data || typeof data !== 'object' || data.version !== 1) return null;
+      if (!data || typeof data !== 'object' || data.version !== SAVE_VERSION) return null;
       if (!Number.isFinite(Number(data.money))) return null;
       return {
         seed: number(data.seed, 0, 0, 4294967295),

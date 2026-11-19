@@ -23,11 +23,14 @@
       label(ctx, u.money(w.money), 32, 58, 30, P.gold, 'left', 'bold');
       label(ctx, u.clock(w.clock), 290, 43, 15, P.muted, 'right');
       label(ctx, w.wanted ? 'WANTED' : 'CLEAN', 290, 62, 12, w.wanted ? P.red : P.muted, 'right', 'bold');
-      bar(ctx, 32, 70, 174, 11, p.health / SB.PLAYER.maxHealth, p.health < 35 ? P.red : P.green);
+      const hpColor = p.health < 35 ? P.red : p.health < 65 ? P.gold : P.green;
+      bar(ctx, 32, 70, 174, 11, p.health / SB.PLAYER.maxHealth, hpColor);
       label(ctx, 'HP ' + Math.max(0, Math.ceil(p.health)), 216, 81, 13, P.text, 'left');
       let stars = '';
       for (let i = 0; i < 5; i += 1) stars += i < w.wanted ? '★' : '☆';
+      if (w.wanted) { ctx.shadowColor = P.gold; ctx.shadowBlur = 8; }
       label(ctx, stars, 32, 110, 19, P.gold, 'left');
+      ctx.shadowBlur = 0;
 
       // Objective strip.
       ctx.fillStyle = 'rgba(15,26,33,0.68)';

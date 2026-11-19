@@ -35,7 +35,8 @@
       skin: u.pick(w.rng, SKINS),
       health: o.cop ? 100 : 36, alive: true, cop: !!o.cop,
       flee: 0, fearX: 0, fearY: 0, fire: 0, punch: 0,
-      walk: w.rng() * 6, corpse: 0, speed: o.cop ? 112 : u.rand(w.rng, 42, 70)
+      walk: w.rng() * 6, corpse: 0, speed: o.cop ? 112 : u.rand(w.rng, 42, 70),
+      scale: u.rand(w.rng, 0.92, 1.08) // a little height variety keeps the sidewalk crowd natural
     };
     w.peds.push(ped);
     return ped;
@@ -61,10 +62,9 @@
       [919, 90, 0, 'sedan'], [1220, 1500, Math.PI, 'taxi'], [90, 1219, Math.PI / 2, 'sedan'],
       [780, 281, 0, 'delivery'], [1081, 1080, Math.PI / 2, 'sports'], [420, 281, 0, 'sedan']
     ];
-    for (const p of parked) SB.makeCar(w, p[0], p[1], p[2], p[3], null, { health: C_HEALTH() });
+    for (const p of parked) SB.makeCar(w, p[0], p[1], p[2], p[3], null, { health: SB.CAR.health });
     for (let i = 0; i < T.peds; i += 1) SB.spawnPed(w);
   };
-  function C_HEALTH() { return SB.CAR.health; }
 
   function nextWaypoint(w, car) {
     const ai = car.ai;
@@ -177,7 +177,7 @@
   };
 
   SB.drawPed = function (ctx, ped, w) {
-    ctx.save(); ctx.translate(ped.x, ped.y);
+    ctx.save(); ctx.translate(ped.x, ped.y); ctx.scale(ped.scale, ped.scale);
     if (!ped.alive) {
       ctx.globalAlpha = u.clamp(ped.corpse / 6, 0, 0.8);
       ctx.fillStyle = '#9c3030';

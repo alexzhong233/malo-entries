@@ -6,7 +6,7 @@
 
   SB.createRenderer = function (canvas) {
     const ctx = canvas.getContext('2d');
-    let dpr = 1, cache = null, cachedCity = null;
+    let dpr = 1, cache = null, cachedCity = null, vignette = null;
 
     function resize() {
       dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -15,6 +15,11 @@
       const scale = Math.min(window.innerWidth / F.width, window.innerHeight / F.height);
       canvas.style.width = Math.round(F.width * scale) + 'px';
       canvas.style.height = Math.round(F.height * scale) + 'px';
+      // Screen-space, so the playfield edges settle into shadow without dimming the HUD.
+      vignette = ctx.createRadialGradient(F.width / 2, F.height / 2, F.height * 0.34,
+        F.width / 2, F.height / 2, F.height * 0.92);
+      vignette.addColorStop(0, 'rgba(10,18,24,0)');
+      vignette.addColorStop(1, 'rgba(10,18,24,0.30)');
     }
 
     function cityCache(city) {
@@ -111,6 +116,8 @@
       SB.effects.drawAir(ctx, c);
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, F.width, F.height);
       if (c.screen !== 'start') { SB.hud.draw(ctx, c); SB.minimap.draw(ctx, c); }
       SB.screens.draw(ctx, c);
     }

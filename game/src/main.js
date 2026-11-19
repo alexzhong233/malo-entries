@@ -143,6 +143,10 @@
     announce('Solara Bay. Press Enter to start.');
     requestAnimationFrame(frame);
     window.addEventListener('beforeunload', function () { if (!shotState) saveGame(); });
+    // Background tabs stop animation frames; save before the browser suspends the page.
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden && !shotState) saveGame();
+    });
   }
 
   // Deterministic scene controls: no keyboard dependency, but the *real* simulation still ticks

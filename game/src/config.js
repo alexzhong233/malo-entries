@@ -43,6 +43,8 @@
     carDamage: 9, footDamage: 8
   };
   SB.DAY = { start: 8 * 60 + 20, minutesPerSecond: 5.5 };
+  // One master gain shared by the WebAudio graph and its mute toggle, so they never disagree.
+  SB.AUDIO = { masterVolume: 0.32 };
   SB.SAVE_KEY = 'solara-bay.save.v1';
 
   SB.PALETTE = {

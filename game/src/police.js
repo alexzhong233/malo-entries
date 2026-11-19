@@ -86,8 +86,8 @@
       }
     }
 
-    // Cop cars pursue and ram.
-    for (const car of w.cops) {
+    // Cop cars pursue and ram. Iterate a copy: a wrecked cruiser is removed from w.cops mid-step.
+    for (const car of w.cops.slice()) {
       if (car.dead) continue;
       const ai = car.ai || (car.ai = { fire: 1, ram: 0 });
       const dx = px - car.x, dy = py - car.y;

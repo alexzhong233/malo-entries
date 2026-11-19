@@ -51,6 +51,9 @@
       const p = w.player, a = p.inCar ? p.inCar.angle : p.angle;
       ctx.save();
       ctx.translate(tx(p.inCar ? p.inCar.x : p.x), ty(p.inCar ? p.inCar.y : p.y));
+      // A soft halo keeps the white arrow legible over pale roads and dark buildings alike.
+      ctx.fillStyle = 'rgba(16,32,40,0.35)';
+      ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fill();
       ctx.rotate(a + Math.PI / 2);
       ctx.fillStyle = '#ffffff';
       ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(4.5, 5); ctx.lineTo(0, 2.5); ctx.lineTo(-4.5, 5); ctx.closePath(); ctx.fill();

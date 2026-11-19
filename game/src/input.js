@@ -23,7 +23,9 @@
     window.addEventListener('keyup', function (event) { held[event.code] = false; });
     window.addEventListener('blur', function () {
       for (const code in held) held[code] = false;
-      mouse.down = false; mouse.right = false;
+      // Queued one-shots would otherwise fire on the first frame after focus returns.
+      for (const code in pressed) pressed[code] = false;
+      mouse.down = false; mouse.right = false; mouse.click = false;
     });
     canvas.addEventListener('pointermove', locate);
     canvas.addEventListener('pointerdown', function (event) {

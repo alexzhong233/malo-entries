@@ -38,6 +38,11 @@ const MIME: Record<string, string> = {
 };
 
 createServer((request, response) => {
+  const method = request.method || 'GET';
+  if (method !== 'GET' && method !== 'HEAD') {
+    response.writeHead(405, { allow: 'GET, HEAD' }).end('method not allowed');
+    return;
+  }
   const url = new URL(request.url ?? '/', 'http://localhost');
   let pathname: string;
   try {
@@ -66,7 +71,9 @@ createServer((request, response) => {
     'content-length': size,
     'cache-control': 'no-store',
   });
-  createReadStream(file).pipe(response);
+  // HEAD requests get the same headers, but no file body.
+  if (method === 'HEAD') response.end();
+  else createReadStream(file).pipe(response);
 }).listen(port, '127.0.0.1', () => {
   console.log(`game/ is on http://localhost:${port}`);
 });

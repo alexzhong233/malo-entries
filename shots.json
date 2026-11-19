@@ -1,18 +1,26 @@
 [
   {
     "name": "01-solara-bay-foot.jpg",
+    "mode": "foot",
+    "seed": 7,
     "query": "?shot=foot&seed=7"
   },
   {
     "name": "02-drive-traffic.jpg",
+    "mode": "drive",
+    "seed": 11,
     "query": "?shot=drive&seed=11"
   },
   {
     "name": "03-police-chase.jpg",
+    "mode": "police",
+    "seed": 23,
     "query": "?shot=police&seed=23"
   },
   {
     "name": "04-mission.jpg",
+    "mode": "mission",
+    "seed": 31,
     "query": "?shot=mission&seed=31"
   }
 ]
