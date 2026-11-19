@@ -1,103 +1,115 @@
-// Solara Bay — tuning constants, names and small shared helpers.
-// Every file is a classic script; SB is the single global namespace.
 (function (SB) {
   'use strict';
 
-  SB.FIELD = { width: 1280, height: 720 };
-  SB.STEP = 1 / 60;
+  // Every tunable number in the game lives here so the world stays consistent.
+  var CFG = {
+    WORLD_W: 6000,
+    WORLD_H: 6000,
+    ROAD_STEP: 330,
+    ROAD_W: 54,
+    SIDEWALK: 16,
+    BLOCK_CELL: 330,
+    WATER_BASE: 175,
 
-  // City geometry: road centre lines sit on multiples of GRID.
-  SB.GRID = 300;
-  SB.ROAD = 76;
-  SB.SIDEWALK = 24;
-  SB.NODES = 6;                       // grid lines 0 .. 1500
-  SB.WORLD = { minX: -240, minY: -80, maxX: 1538, maxY: 1538, waterX: -196 };
+    DAY_LENGTH: 420,          // real seconds for a whole day/night cycle
+    START_HOUR: 9.4,
 
-  SB.CITY_NAME = 'Solara Bay';
-  SB.DISTRICTS = ['Sunset Strand', 'Palm Row', 'Vista Heights', 'Old Harbor', 'Neon Mile'];
-  SB.STREETS_H = ['Harbor Way', 'Cedar Avenue', 'Sunset Boulevard', 'Palm Street', 'Coral Road', 'Bay Boulevard'];
-  SB.STREETS_V = ['Ocean Boulevard', 'Marina Drive', 'Granada Avenue', 'Central Avenue', 'Dolphin Drive', 'Pier Road'];
-  SB.CHARACTERS = {
-    fixer: { name: 'Marisol Vega', role: 'Mission fixer' },
-    marina: { name: 'Dorian Kestrel', role: 'Crooked marina owner' },
-    driver: { name: 'Rico Sandoval', role: 'Wheel man' },
-    rival: { name: 'Nico "Nightjar" Serrano', role: 'Rival crew leader' },
-    detective: { name: 'Det. Mara Vale', role: 'Internal Affairs' },
-    mayor: { name: 'Mayor Celeste Ruiz', role: 'City Hall' }
+    PLAYER: {
+      SPEED: 218,
+      ACCEL: 1500,
+      FRICTION: 9,
+      RADIUS: 12,
+      MAX_HEALTH: 100,
+      SHOOT_DELAY: 0.135,
+      BULLET_SPEED: 1150,
+      BULLET_LIFE: 0.72
+    },
+
+    CAR: {
+      ACCEL: 260,
+      BOOST: 1.55,
+      BRAKE: 470,
+      REVERSE: 130,
+      MAX_SPEED: 405,
+      DRAG: 0.42,
+      ROLL: 38,
+      TURN: 2.45,
+      SIDE_GRIP: 8.5,
+      DRIFT_GRIP: 1.45,
+      RADIUS: 21,
+      MAX_HEALTH: 100
+    },
+
+    POLICE: {
+      SIGHT: 920,
+      DESPAWN: 1900,
+      LOSE_TIME: 14,
+      OFFICER_SIGHT: 620,
+      OFFICER_RANGE: 390,
+      MAX_CARS: 8
+    },
+
+    CAMERA: {
+      FOLLOW: 5.4,
+      LOOK_AHEAD: 0.42,
+      ZOOM: 1,
+      ZOOM_DRIVE: 0.88,
+      LERP_ZOOM: 3.2
+    },
+
+    COLORS: {
+      waterDeep: '#0b8ba3',
+      waterShallow: '#36cfd0',
+      foam: '#e9fffa',
+      sand: '#f2d9a2',
+      sandDark: '#d9b97f',
+      asphalt: '#555962',
+      asphaltLight: '#646872',
+      lane: '#f4e6b4',
+      sidewalk: '#c9c2ae',
+      lot: '#b7ad9b',
+      grass: '#79ad5d',
+      grassDark: '#5c9349',
+      parkPath: '#d8c79a',
+      shadow: 'rgba(48,35,28,0.24)',
+      ink: '#20262e',
+      sun: '#ffd58a',
+      police: '#e8f2ff',
+      policeBlue: '#2c64c8',
+      hud: '#f7f3e8',
+      gold: '#ffd45e',
+      danger: '#ff5d55'
+    },
+
+    BUILDING_PALETTES: [
+      ['#e8cfae', '#c9a77e', '#a88262'],
+      ['#f0d9bb', '#d3b391', '#ab8c6d'],
+      ['#e4c9bd', '#c6a297', '#9d7d74'],
+      ['#e9d7a6', '#cbb87f', '#a39463'],
+      ['#d9cfc4', '#b3a89c', '#8f857b'],
+      ['#f1cfa4', '#d0a878', '#a67e55'],
+      ['#d8d6cb', '#b4b2a6', '#8c8b81']
+    ],
+
+    CAR_COLORS: [
+      '#e94f43', '#f3b431', '#3fa9d8', '#e9e9e2', '#313944',
+      '#8d5fc4', '#43b887', '#ef7f3e', '#c9d3dc', '#b03a5b'
+    ],
+
+    LANDMARKS: {
+      spawn: { x: 965, y: 1120 },
+      beach: { x: 275, y: 1180 },
+      boardwalk: { x: 390, y: 1650 },
+      marina: { x: 545, y: 4310 },
+      docks: { x: 520, y: 4750 },
+      park: { x: 4540, y: 1840 },
+      courthouse: { x: 3600, y: 3430 },
+      sunset: { x: 5320, y: 5280 },
+      highway: { x: 5520, y: 930 },
+      vault: { x: 2940, y: 2600 },
+      chopshop: { x: 1295, y: 4020 }
+    }
   };
 
-  SB.PLAYER = {
-    speed: 166, sprint: 244, radius: 11, maxHealth: 100,
-    fireRate: 0.20, punchRate: 0.42, punchRange: 36, punchDamage: 34,
-    hotwireTime: 1.05, ammo: 36, respawnX: 600, respawnY: 600
-  };
-  SB.CAR = {
-    accel: 320, reverse: 170, maxSpeed: 268, brake: 460,
-    grip: 7.6, driftGrip: 1.5, steer: 2.55, drag: 0.55,
-    radius: 22, health: 200, collisionDamage: 0.04
-  };
-  SB.TRAFFIC = { cars: 40, peds: 30, speed: 96, fleeingSpeed: 158 };
-  SB.POLICE = {
-    maxCars: 8, spawnEvery: 12, sight: 560, decayTime: 15,
-    arrestTime: 2.0, officerRange: 380, officerShot: 2.05,
-    carDamage: 9, footDamage: 8
-  };
-  SB.DAY = { start: 8 * 60 + 20, minutesPerSecond: 5.5 };
-  // One master gain shared by the WebAudio graph and its mute toggle, so they never disagree.
-  // A little more headroom keeps stacked sirens, engines and gunfire from clipping.
-  SB.AUDIO = { masterVolume: 0.28 };
-  SB.SAVE_KEY = 'solara-bay.save.v1';
-
-  SB.PALETTE = {
-    asphalt: '#a98560', asphaltDark: '#977250', roadLine: '#f4ddb0',
-    sand: '#e7c998', sandDark: '#d9b680', water: '#2799a1', waterDeep: '#1d7f8b',
-    foam: '#d7f3e8', grass: '#6fa85e', grassDark: '#548944',
-    sidewalk: '#e3cb9e', shadow: 'rgba(43,32,22,0.24)',
-    ink: '#17232a', panel: 'rgba(15,26,33,0.80)', panelLight: 'rgba(22,38,45,0.90)',
-    text: '#fff4df', muted: '#b9c5c0', gold: '#ffc857', red: '#e8564b',
-    teal: '#37c5b6', blue: '#6cbfe8', green: '#6bd07a'
-  };
-  SB.FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif';
-
-  // mulberry32: the same seed rebuilds the exact same city and traffic.
-  SB.rng = function (seed) {
-    let a = seed | 0;
-    return function () {
-      a = (a + 0x6d2b79f5) | 0;
-      let t = Math.imul(a ^ (a >>> 15), 1 | a);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-  };
-
-  const u = SB.u = {};
-  u.clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
-  u.lerp = (a, b, t) => a + (b - a) * t;
-  u.dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
-  u.rand = (r, lo, hi) => lo + r() * (hi - lo);
-  u.pick = (r, list) => list[Math.floor(r() * list.length) % list.length];
-  u.angleDiff = function (a, b) {
-    let d = (a - b + Math.PI * 3) % (Math.PI * 2) - Math.PI;
-    return d;
-  };
-  u.turnToward = function (from, to, maxStep) {
-    const d = u.angleDiff(to, from);
-    return from + u.clamp(d, -maxStep, maxStep);
-  };
-  u.approach = function (value, target, step) {
-    return value < target ? Math.min(target, value + step) : Math.max(target, value - step);
-  };
-  u.circleRect = function (cx, cy, r, rect) {
-    const nx = u.clamp(cx, rect.x, rect.x + rect.w);
-    const ny = u.clamp(cy, rect.y, rect.y + rect.h);
-    const dx = cx - nx, dy = cy - ny;
-    return dx * dx + dy * dy < r * r;
-  };
-  u.money = function (n) {
-    return '$' + Math.max(0, Math.round(n)).toLocaleString('en-US');
-  };
-  u.clock = function (minutes) {
-    const m = ((Math.floor(minutes) % 1440) + 1440) % 1440;
-    return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
-  };
+  SB.CFG = CFG;
 })(window.SB = window.SB || {});

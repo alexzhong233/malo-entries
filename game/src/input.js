@@ -1,62 +1,65 @@
-// Keyboard and pointer state. Held keys are polled; one-shot presses are queued until consume(),
-// so a press between two fixed steps is never lost or counted twice.
 (function (SB) {
   'use strict';
-  const F = SB.FIELD;
 
-  SB.createInput = function (canvas) {
-    const held = Object.create(null);
-    const pressed = Object.create(null);
-    const mouse = { x: F.width / 2, y: F.height / 2, down: false, right: false, click: false };
-    const swallow = { ArrowUp: 1, ArrowDown: 1, ArrowLeft: 1, ArrowRight: 1, Space: 1, Tab: 1, Escape: 1 };
+  var keys = Object.create(null);
+  var fresh = Object.create(null);
+  var mouse = { x: 640, y: 360, down: false, justDown: false, justUp: false, wheel: 0 };
+  var block = { Tab: 1, Space: 1, ArrowUp: 1, ArrowDown: 1, ArrowLeft: 1, ArrowRight: 1, Escape: 1, KeyC: 1, KeyE: 1, KeyF: 1 };
 
-    function locate(event) {
-      const rect = canvas.getBoundingClientRect();
-      // A collapsed (hidden) canvas must not turn the aim point into NaN.
-      mouse.x = (event.clientX - rect.left) / (rect.width || 1) * F.width;
-      mouse.y = (event.clientY - rect.top) / (rect.height || 1) * F.height;
-    }
-    window.addEventListener('keydown', function (event) {
-      if (swallow[event.code]) event.preventDefault();
-      held[event.code] = true;
-      if (!event.repeat) pressed[event.code] = true;
+  function init(canvas) {
+    window.addEventListener('keydown', function (e) {
+      if (block[e.code]) e.preventDefault();
+      if (!e.repeat) fresh[e.code] = true;
+      keys[e.code] = true;
+      SB.Audio.init(); SB.Audio.resume();
+    }, { passive: false });
+
+    window.addEventListener('keyup', function (e) {
+      keys[e.code] = false;
     });
-    window.addEventListener('keyup', function (event) { held[event.code] = false; });
+
+    canvas.addEventListener('mousemove', function (e) {
+      var r = canvas.getBoundingClientRect();
+      mouse.x = (e.clientX - r.left) * (canvas.clientWidth / Math.max(1, r.width));
+      mouse.y = (e.clientY - r.top) * (canvas.clientHeight / Math.max(1, r.height));
+    });
+
+    canvas.addEventListener('mousedown', function (e) {
+      if (e.button !== 0) return;
+      mouse.down = true; mouse.justDown = true;
+      SB.Audio.init(); SB.Audio.resume();
+      e.preventDefault();
+    });
+    window.addEventListener('mouseup', function (e) {
+      if (e.button !== 0) return;
+      mouse.down = false; mouse.justUp = true;
+    });
+    canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    canvas.addEventListener('wheel', function (e) { mouse.wheel += e.deltaY; e.preventDefault(); }, { passive: false });
     window.addEventListener('blur', function () {
-      for (const code in held) held[code] = false;
-      // Queued one-shots would otherwise fire on the first frame after focus returns.
-      for (const code in pressed) pressed[code] = false;
-      mouse.down = false; mouse.right = false; mouse.click = false;
+      keys = Object.create(null); mouse.down = false;
     });
-    canvas.addEventListener('pointermove', locate);
-    canvas.addEventListener('pointerdown', function (event) {
-      locate(event);
-      if (event.button === 0) { mouse.down = true; pressed.Mouse0 = true; mouse.click = true; }
-      if (event.button === 2) { mouse.right = true; pressed.Mouse2 = true; }
-      event.preventDefault();
-    });
-    window.addEventListener('pointerup', function (event) {
-      if (event.button === 0) mouse.down = false;
-      if (event.button === 2) mouse.right = false;
-    });
-    canvas.addEventListener('contextmenu', function (event) { event.preventDefault(); });
+  }
 
-    return {
-      mouse,
-      isDown: function (code) { return !!held[code]; },
-      axis: function (negative, positive) { return (held[positive] ? 1 : 0) - (held[negative] ? 1 : 0); },
-      consume: function (code) {
-        if (!pressed[code]) return false;
-        pressed[code] = false;
-        return true;
-      },
-      clear: function () {
-        for (const code in pressed) pressed[code] = false;
-        mouse.click = false;
-      },
-      aim: function (cam) { return SB.camera.toWorld(cam, mouse.x, mouse.y); },
-      // Clear both the click flag and its queued key so a synthetic first gesture cannot leak into a menu.
-      firstGesture: function () { mouse.click = false; pressed.Mouse0 = false; return true; }
-    };
+  function down(code) { return !!keys[code]; }
+  function just(code) { return !!fresh[code]; }
+  function shift() { return !!(keys.ShiftLeft || keys.ShiftRight); }
+  function anyMove() {
+    return down('KeyW') || down('KeyA') || down('KeyS') || down('KeyD') ||
+      down('ArrowUp') || down('ArrowLeft') || down('ArrowDown') || down('ArrowRight');
+  }
+  function consume(code) { fresh[code] = false; }
+
+  function endFrame() {
+    fresh = Object.create(null);
+    mouse.justDown = false;
+    mouse.justUp = false;
+    mouse.wheel = 0;
+  }
+
+  SB.Input = {
+    keys: keys, mouse: mouse, init: init, down: down, just: just, consume: consume,
+    shift: shift, anyMove: anyMove, endFrame: endFrame,
+    worldX: 0, worldY: 0
   };
 })(window.SB = window.SB || {});

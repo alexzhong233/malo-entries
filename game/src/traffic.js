@@ -1,206 +1,171 @@
-// Traffic and pedestrians: lane-following AI, wandering walkers, gunfire panic, and the small
-// drawn people that populate the sidewalks.
 (function (SB) {
   'use strict';
-  const u = SB.u, G = SB.GRID, T = SB.TRAFFIC, P = SB.PALETTE;
 
-  const DIRS = [{ i: 1, j: 0, a: 0 }, { i: 0, j: 1, a: Math.PI / 2 }, { i: -1, j: 0, a: Math.PI }, { i: 0, j: -1, a: -Math.PI / 2 }];
-  const SHIRTS = ['#d76b58', '#4e86a8', '#e0b455', '#6e9e67', '#a673a2', '#e8e0c9', '#3e6b78'];
-  const SKINS = ['#d9a97f', '#b97b55', '#8d5c3e', '#e8c39c', '#6f4732'];
+  var CFG = SB.CFG, U = SB.U, CITY = SB.City;
+  var LANE = CFG.ROAD_W * 0.27;
 
-  function laneOffset(dir, node) {
-    const x = node.i * G, y = node.j * G;
-    if (dir === 0) return { x, y: y + 19 };
-    if (dir === 2) return { x, y: y - 19 };
-    if (dir === 1) return { x: x - 19, y };
-    return { x: x + 19, y };
+  function nearestIndex(list, v) {
+    var best = 0, bd = Infinity;
+    for (var i = 0; i < list.length; i++) {
+      var d = Math.abs(list[i] - v);
+      if (d < bd) { bd = d; best = i; }
+    }
+    return best;
   }
 
-  SB.spawnTrafficCar = function (w, x, y, dir, type) {
-    const ai = { dir, node: null, wx: 0, wy: 0, flee: 0, yield: 0 };
-    const car = SB.makeCar(w, x, y, DIRS[dir].a, type || u.pick(w.rng, ['sedan', 'sedan', 'taxi', 'van', 'sports']), null, { ai });
-    const here = w.city.node(x, y);
-    ai.node = { i: u.clamp(here.i + DIRS[dir].i, 0, SB.NODES - 1), j: u.clamp(here.j + DIRS[dir].j, 0, SB.NODES - 1) };
-    const wp = laneOffset(dir, ai.node); ai.wx = wp.x; ai.wy = wp.y;
-    return car;
-  };
-
-  SB.spawnPed = function (w, x, y, opts) {
-    const o = opts || {};
-    const point = o.x == null ? w.city.randomSidewalkPoint(w.rng) : { x, y };
-    const ped = {
-      x: point.x, y: point.y, angle: w.rng() * Math.PI * 2,
-      tx: point.x, ty: point.y,
-      color: o.cop ? '#386fa4' : u.pick(w.rng, SHIRTS),
-      skin: u.pick(w.rng, SKINS),
-      health: o.cop ? 100 : 36, alive: true, cop: !!o.cop,
-      flee: 0, fearX: 0, fearY: 0, fire: 0, punch: 0,
-      walk: w.rng() * 6, corpse: 0, speed: o.cop ? 112 : u.rand(w.rng, 42, 70),
-      scale: u.rand(w.rng, 0.92, 1.08) // a little height variety keeps the sidewalk crowd natural
-    };
-    w.peds.push(ped);
-    return ped;
-  };
-
-  SB.spawnInitial = function (w) {
-    const r = w.rng;
-    for (let i = 0; i < T.cars; i += 1) {
-      const dir = Math.floor(r() * 4);
-      const line = Math.floor(r() * SB.NODES);
-      const along = u.rand(r, 60, 1440);
-      const offset = dir === 0 ? 19 : dir === 2 ? -19 : dir === 1 ? -19 : 19;
-      const x = dir % 2 === 0 ? along : line * G + offset;
-      const y = dir % 2 === 0 ? line * G + offset : along;
-      if (u.dist(x, y, SB.PLAYER.respawnX, SB.PLAYER.respawnY) < 140) continue;
-      SB.spawnTrafficCar(w, x, y, dir);
-    }
-    // Parked cars, including the two job vehicles. These have no AI until stolen.
-    const parked = [
-      [560, 619, -Math.PI / 2, 'sedan'], [961, 619, Math.PI / 2, 'sports'],
-      [720, 619, 0, 'delivery'], [318, 930, 0, 'van'], [1181, 318, Math.PI / 2, 'taxi'],
-      [600, 1218, 0, 'sedan'], [1500, 919, Math.PI / 2, 'sports'], [241, 540, -Math.PI / 2, 'van'],
-      [919, 90, 0, 'sedan'], [1220, 1500, Math.PI, 'taxi'], [90, 1219, Math.PI / 2, 'sedan'],
-      [780, 281, 0, 'delivery'], [1081, 1080, Math.PI / 2, 'sports'], [420, 281, 0, 'sedan']
-    ];
-    for (const p of parked) SB.makeCar(w, p[0], p[1], p[2], p[3], null, { health: SB.CAR.health });
-    for (let i = 0; i < T.peds; i += 1) SB.spawnPed(w);
-  };
-
-  function nextWaypoint(w, car) {
-    const ai = car.ai;
-    const here = ai.node;
-    let dir = ai.dir;
-    const threatNear = ai.flee > 0 || (w.time - w.lastGunshot < 2.5 && u.dist(car.x, car.y, w.player.x, w.player.y) < 360);
-    if (threatNear) {
-      ai.flee = Math.max(ai.flee, 3);
-      dir = (dir + (w.rng() < 0.5 ? 1 : 3)) % 4;
-    } else if (w.rng() < 0.28) {
-      dir = (dir + (w.rng() < 0.5 ? 1 : 3)) % 4;
-    }
-    ai.dir = dir;
-    const delta = DIRS[dir];
-    ai.node = {
-      i: u.clamp(here.i + delta.i, 0, SB.NODES - 1),
-      j: u.clamp(here.j + delta.j, 0, SB.NODES - 1)
-    };
-    if (ai.node.i === here.i && ai.node.j === here.j) { ai.node = here; ai.dir = (dir + 2) % 4; }
-    const wp = laneOffset(ai.dir, ai.node);
-    ai.wx = wp.x; ai.wy = wp.y;
-  }
-
-  SB.updateTraffic = function (w, dt) {
-    for (const car of w.cars) {
-      if (!car.ai || car.ai.rival || car.isCop || car.dead || car.player) continue;
-      const ai = car.ai;
-      ai.flee = Math.max(0, ai.flee - dt);
-      if (ai.wx == null || u.dist(car.x, car.y, ai.wx, ai.wy) < 46) nextWaypoint(w, car);
-      const dx = ai.wx - car.x, dy = ai.wy - car.y;
-      const target = Math.atan2(dy, dx);
-      const steer = u.clamp(u.angleDiff(target, car.angle) * 2.4, -1, 1);
-      let throttle = 0.62;
-      if (Math.abs(u.angleDiff(target, car.angle)) > 1.1) throttle = 0.25;
-      if (ai.flee > 0) throttle = 1;
-      // Yield: ease off when another car sits just ahead.
-      ai.yield -= dt;
-      if (ai.yield <= 0) {
-        ai.yield = 0.2; // recheck the road ahead a little more often
-        for (const other of w.cars) {
-          if (other === car || other.dead) continue;
-          const d = u.dist(other.x, other.y, car.x, car.y);
-          if (d > 55 || d < 1) continue;
-          const toward = Math.atan2(other.y - car.y, other.x - car.x);
-          if (Math.abs(u.angleDiff(toward, car.angle)) < 0.7) { throttle = 0; break; }
+  function nextIntersection(city, car, x, y) {
+    var list, coord, lane, dir = car.dir;
+    if (car.axis === 'h') {
+      list = city.roadXs; coord = y; lane = car.lane;
+      for (var i = 0; i < list.length; i++) {
+        var px = list[i] + lane;
+        if ((px - x) * dir > 24 && !CITY.isWater(px, coord, city)) {
+          return { x: px, y: coord, index: i };
         }
       }
-      SB.driveCar(w, car, throttle, steer, false, dt);
-    }
-  };
-
-  SB.hurtPed = function (w, ped, damage, source) {
-    if (!ped.alive) return;
-    ped.health -= damage;
-    SB.effects.burst(w, ped.x, ped.y, 'blood', damage > 40 ? 12 : 4);
-    if (ped.health <= 0) {
-      ped.alive = false;
-      ped.corpse = 18;
-      w.stats.kills += 1;
-      const fromPlayer = (source && source.team === 'player') || (source && source === w.player.inCar);
-      if (fromPlayer) SB.raiseWanted(w, ped.cop ? 2 : 1, ped.cop ? 'cop killed' : 'pedestrian killed');
-      if (!ped.cop && w.rng() < 0.45) SB.addPickup(w, ped.x, ped.y, 'cash', 20 + Math.floor(w.rng() * 60));
-      if (ped.cop) SB.addPickup(w, ped.x, ped.y, 'ammo', 12);
     } else {
-      ped.flee = 4;
-      const sx = source ? source.x : w.player.x, sy = source ? source.y : w.player.y;
-      const a = Math.atan2(ped.y - sy, ped.x - sx);
-      ped.fearX = ped.x + Math.cos(a) * 180; ped.fearY = ped.y + Math.sin(a) * 180;
-    }
-  };
-
-  SB.newPedTarget = function (w, ped) {
-    for (let i = 0; i < 30; i += 1) {
-      const a = w.rng() * Math.PI * 2;
-      const x = ped.x + Math.cos(a) * u.rand(w.rng, 40, 150);
-      const y = ped.y + Math.sin(a) * u.rand(w.rng, 40, 150);
-      if (w.city.isSidewalk(x, y) && !w.city.buildingAt(x, y)) { ped.tx = x; ped.ty = y; return; }
-    }
-    const p = w.city.randomSidewalkPoint(w.rng);
-    ped.tx = p.x; ped.ty = p.y;
-  };
-
-  SB.updatePeds = function (w, dt) {
-    for (const ped of w.peds) {
-      if (ped.cop) continue;
-      if (!ped.alive) { ped.corpse -= dt; continue; }
-      if (w.time - w.lastGunshot < 1.5 && u.dist(ped.x, ped.y, w.player.x, w.player.y) < 300 && !ped.flee) {
-        ped.flee = 4;
-        ped.fearX = ped.x + (ped.x - w.player.x) * 1.4;
-        ped.fearY = ped.y + (ped.y - w.player.y) * 1.4;
+      list = city.roadYs; coord = x; lane = car.lane;
+      for (var j = 0; j < list.length; j++) {
+        var py = list[j] + lane;
+        if ((py - y) * dir > 24 && !CITY.isWater(coord, py, city)) {
+          return { x: coord, y: py, index: j };
+        }
       }
-      ped.flee = Math.max(0, ped.flee - dt);
-      const tx = ped.flee > 0 ? ped.fearX : ped.tx;
-      const ty = ped.flee > 0 ? ped.fearY : ped.ty;
-      if (u.dist(ped.x, ped.y, tx, ty) < 12) {
-        if (ped.flee > 0) ped.flee = 0;
-        SB.newPedTarget(w, ped);
-      }
-      const a = Math.atan2(ty - ped.y, tx - ped.x);
-      ped.angle = u.turnToward(ped.angle, a, 7 * dt);
-      const speed = ped.flee > 0 ? 168 : ped.speed; // panic covers ground faster than a casual stroll
-      const hit = w.city.resolveCircle(ped.x + Math.cos(a) * speed * dt, ped.y + Math.sin(a) * speed * dt, 7);
-      ped.x = hit.x; ped.y = hit.y;
-      ped.walk += speed * dt * 0.12;
     }
-    for (let i = w.peds.length - 1; i >= 0; i -= 1) {
-      const ped = w.peds[i];
-      if (!ped.alive && ped.corpse <= 0 && w.peds.length > 20) w.peds.splice(i, 1);
-    }
-  };
+    return null;
+  }
 
-  SB.drawPed = function (ctx, ped, w) {
-    ctx.save(); ctx.translate(ped.x, ped.y); ctx.scale(ped.scale, ped.scale);
-    if (!ped.alive) {
-      ctx.globalAlpha = u.clamp(ped.corpse / 6, 0, 0.8);
-      ctx.fillStyle = '#9c3030';
-      ctx.beginPath(); ctx.ellipse(0, 0, 13, 8, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = ped.color;
-      ctx.beginPath(); ctx.ellipse(2, 0, 8, 5, 0.3, 0, Math.PI * 2); ctx.fill();
-      ctx.restore(); return;
+  function spawn(world, rng) {
+    var city = world.city, road = CITY.randomRoadPoint(city, rng);
+    var axis = road.vertical ? 'v' : 'h';
+    var dir = rng() > 0.5 ? 1 : -1;
+    var lane = dir * LANE;
+    var x = axis === 'v' ? road.x + lane : road.x;
+    var y = axis === 'v' ? road.y : road.y + lane;
+    var angle = axis === 'v' ? (dir > 0 ? Math.PI / 2 : -Math.PI / 2) : (dir > 0 ? 0 : Math.PI);
+    var type = rng() > 0.86 ? 'truck' : (rng() > 0.68 ? 'sport' : 'sedan');
+    var car = SB.Vehicles.create(x, y, angle, {
+      type: type, ai: true, maxSpeed: U.range(rng, 155, 235)
+    });
+    car.axis = axis;
+    car.dir = dir;
+    car.lane = lane;
+    car.rng = rng;
+    car.speed = U.range(rng, 50, 110);
+    car.vx = Math.cos(angle) * car.speed;
+    car.vy = Math.sin(angle) * car.speed;
+    if (rng() > 0.82) { car.color = '#f2c33d'; car.type = 'taxi'; }
+    var next = nextIntersection(city, car, x, y);
+    if (next) { car.tx = next.x; car.ty = next.y; car.targetIndex = next.index; }
+    else { car.tx = x + Math.cos(angle) * 400; car.ty = y + Math.sin(angle) * 400; }
+    return car;
+  }
+
+  function turnAtIntersection(world, car) {
+    var city = world.city, rng = car.rng;
+    var straight = car.axis;
+    var nextAxis = rng() < 0.24 ? (straight === 'h' ? 'v' : 'h') : straight;
+    if (nextAxis !== straight) {
+      // Turning swaps which street is the lane and which road we follow.
+      var roadList = nextAxis === 'h' ? city.roadYs : city.roadXs;
+      var roadCoord = nearestIndex(roadList, nextAxis === 'h' ? car.y : car.x);
+      var newDir = rng() > 0.5 ? 1 : -1;
+      car.axis = nextAxis;
+      car.dir = newDir;
+      car.lane = newDir * LANE;
+      if (nextAxis === 'h') {
+        car.y = roadList[roadCoord] + car.lane;
+        car.x += newDir * 6;
+      } else {
+        car.x = roadList[roadCoord] + car.lane;
+        car.y += newDir * 6;
+      }
+      car.angle = nextAxis === 'h' ? (newDir > 0 ? 0 : Math.PI) : (newDir > 0 ? Math.PI / 2 : -Math.PI / 2);
+    } else {
+      var list = straight === 'h' ? city.roadXs : city.roadYs;
+      var roadIdx = nearestIndex(list, straight === 'h' ? car.x : car.y);
+      var ahead = list[roadIdx] + (straight === 'h' ? car.lane : car.lane);
+      // Find the first road centre beyond our current position.
+      for (var i = 0; i < list.length; i++) {
+        if ((list[i] - (straight === 'h' ? car.x : car.y)) * car.dir > 20) { roadIdx = i; break; }
+      }
+      if (straight === 'h') { car.x = list[roadIdx] + car.lane; }
+      else { car.y = list[roadIdx] + car.lane; }
+      ahead = straight === 'h' ? car.x : car.y;
     }
-    ctx.fillStyle = P.shadow;
-    ctx.beginPath(); ctx.ellipse(3, 4, 9, 5, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.rotate(ped.angle + Math.PI / 2);
-    const step = Math.sin(ped.walk) * 3;
-    ctx.strokeStyle = '#303a3e'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(-3, 4); ctx.lineTo(-4 + step, 10); ctx.moveTo(3, 4); ctx.lineTo(4 - step, 10); ctx.stroke();
-    ctx.fillStyle = ped.color;
-    ctx.fillRect(-6, -5, 12, 11);
-    ctx.strokeStyle = ped.skin; ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.moveTo(-6, -3); ctx.lineTo(-9 - step, 1); ctx.moveTo(6, -3); ctx.lineTo(9 + step, 1); ctx.stroke();
-    ctx.fillStyle = ped.skin;
-    ctx.beginPath(); ctx.arc(0, -9, 5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = ped.cop ? '#203b5e' : '#3b2b24';
-    ctx.beginPath(); ctx.arc(0, -10, 5, Math.PI, Math.PI * 2); ctx.fill();
-    if (ped.cop) { ctx.fillStyle = '#203b5e'; ctx.fillRect(-7, -16, 14, 3); }
-    ctx.restore();
-  };
+    var next = nextIntersection(city, car, car.x, car.y);
+    if (next) { car.tx = next.x; car.ty = next.y; car.targetIndex = next.index; }
+    else {
+      car.dir *= -1;
+      car.lane = car.dir * LANE;
+      next = nextIntersection(city, car, car.x, car.y);
+      if (next) { car.tx = next.x; car.ty = next.y; car.targetIndex = next.index; }
+      else { car.tx = car.x + Math.cos(car.angle) * 300; car.ty = car.y + Math.sin(car.angle) * 300; }
+    }
+  }
+
+  function obstruction(world, car) {
+    var fx = Math.cos(car.angle), fy = Math.sin(car.angle);
+    var others = world.traffic;
+    for (var i = 0; i < others.length; i++) {
+      var o = others[i];
+      if (o === car || o.wrecked) continue;
+      var dx = o.x - car.x, dy = o.y - car.y;
+      var forward = dx * fx + dy * fy;
+      if (forward < 6 || forward > 105) continue;
+      var side = Math.abs(-dx * fy + dy * fx);
+      if (side < 22) return true;
+    }
+    var pc = world.player.car;
+    if (pc && pc !== car && !pc.wrecked) {
+      var px = pc.x - car.x, py = pc.y - car.y;
+      var pf = px * fx + py * fy;
+      if (pf > 4 && pf < 125 && Math.abs(-px * fy + py * fx) < 26) return true;
+    }
+    return false;
+  }
+
+  function init(world) {
+    world.traffic.length = 0;
+    var rng = world.rng;
+    for (var i = 0; i < 42; i++) world.traffic.push(spawn(world, rng));
+  }
+
+  function update(world, dt) {
+    var cam = world.camera;
+    for (var i = 0; i < world.traffic.length; i++) {
+      var car = world.traffic[i];
+      if (car.stolen || car.parked) continue;
+      if (U.dist2(car.x, car.y, cam.x, cam.y) > 2300 * 2300) {
+        var rp = CITY.randomRoadPoint(world.city, car.rng);
+        if (U.dist2(rp.x, rp.y, cam.x, cam.y) < 1400 * 1400) {
+          car.x = rp.x; car.y = rp.y;
+          car.axis = rp.vertical ? 'v' : 'h';
+          car.dir = car.rng() > 0.5 ? 1 : -1;
+          car.lane = car.dir * LANE;
+          car.angle = car.axis === 'v' ? (car.dir > 0 ? Math.PI / 2 : -Math.PI / 2) : (car.dir > 0 ? 0 : Math.PI);
+          var n = nextIntersection(world.city, car, car.x, car.y);
+          if (n) { car.tx = n.x; car.ty = n.y; car.targetIndex = n.index; }
+        }
+        continue;
+      }
+      if (car.wrecked) {
+        SB.Vehicles.integrate(world, car, 0, 0, true, false, dt);
+        continue;
+      }
+      var d = U.dist(car.x, car.y, car.tx, car.ty);
+      if (d < 17) turnAtIntersection(world, car);
+      d = U.dist(car.x, car.y, car.tx, car.ty);
+      var speed = car.maxSpeed * 0.58;
+      // A simple two-phase signal keeps the grid from flowing all at once.
+      var phase = Math.floor(world.elapsed / 6 + (car.targetIndex || 0)) % 2;
+      var redLight = car.axis === 'h' ? phase === 0 : phase === 1;
+      if (redLight && d < 92) speed = 0;
+      if (obstruction(world, car)) speed = 0;
+      if (car.health < 40) speed *= 0.6;
+      SB.Vehicles.driveAI(world, car, car.tx, car.ty, dt, { speed: speed, stopAt: 0 });
+    }
+  }
+
+  SB.Traffic = { init: init, update: update, spawn: spawn };
 })(window.SB = window.SB || {});

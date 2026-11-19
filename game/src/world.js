@@ -1,211 +1,178 @@
-// World state: player, cars, peds, cops, bullets and pickups, plus the spatial queries and
-// bookkeeping shared by every system. Systems after this file mutate state; nothing draws here.
 (function (SB) {
   'use strict';
-  const u = SB.u, P = SB.PLAYER, W = SB.WORLD;
 
-  SB.createWorld = function (seed) {
-    const w = {
-      seed, rng: SB.rng(seed), city: SB.createCity(seed),
-      time: 0, clock: SB.DAY.start, money: 280, screen: 'start',
-      player: {
-        x: P.respawnX, y: P.respawnY, angle: -Math.PI / 2,
-        aimX: P.respawnX + 100, aimY: P.respawnY,
-        health: P.maxHealth, inCar: null, gun: true, ammo: P.ammo,
-        fire: 0, punch: 0, muzzle: 0, fist: 0, walk: 0, hurt: 0,
-        hotwire: 0, hotwireTarget: null, moving: false, sprinting: false
-      },
-      cars: [], peds: [], cops: [], bullets: [], pickups: [],
-      wanted: 0, unseen: 0, copTimer: 6, arrest: 0,
-      lastLoss: 0, // no booking fee before the first downPlayer() call
-      lastGunshot: -99, lastExplosion: -99,
-      banner: { text: '', sub: '', time: 0 },
-      mission: {
-        index: 0, stage: 0, target: { x: 600, y: 540 }, car: null, counter: 0,
-        done: false, gap: 0, extra: '', rivals: [], rivalCars: [], boss: null, chaseTime: 0
-      },
+  var CFG = SB.CFG, U = SB.U, CITY = SB.City;
+
+  function spawnPed(world, x, y) {
+    var rng = world.rng;
+    var colors = ['#f4d06f', '#e96f61', '#5fb2c9', '#b98bd7', '#f2f2e8', '#4f6b8a', '#78b96a'];
+    return {
+      x: x, y: y, angle: rng() * U.TAU,
+      speed: U.range(rng, 38, 66),
+      wx: x, wy: y, phase: rng() * 10,
+      shirt: U.pick(rng, colors),
+      skin: U.pick(rng, ['#8d5b3f', '#c68a62', '#e7b78d', '#5b3d30']),
+      panic: 0
+    };
+  }
+
+  function newPedWaypoint(world, ped) {
+    var rng = world.rng, p = CITY.randomRoadPoint(world.city, rng);
+    var off = CFG.ROAD_W * 0.5 + CFG.SIDEWALK * 0.6;
+    if (rng() > 0.5) off = -off;
+    var x = p.x + (p.vertical ? off : 0), y = p.y + (p.vertical ? 0 : off);
+    if (!CITY.blocked(world.city, x, y, 8)) { ped.wx = x; ped.wy = y; }
+    else { ped.wx = U.clamp(ped.x + U.range(rng, -160, 160), 50, CFG.WORLD_W - 50);
+           ped.wy = U.clamp(ped.y + U.range(rng, -160, 160), 50, CFG.WORLD_H - 50); }
+  }
+
+  function create(city, save) {
+    save = save || {};
+    var rng = U.rng(0x51a2a + Math.floor(Math.random() * 100000));
+    var spawn = save.position || CFG.LANDMARKS.spawn;
+    var world = {
+      city: city,
+      rng: rng,
+      elapsed: 0,
+      clock: CFG.START_HOUR,
+      state: 'start',
+      menuIndex: 0,
+      cash: typeof save.cash === 'number' ? save.cash : 350,
+      wanted: 0,
+      heat: 0,
+      seenTimer: 0,
+      lostTimer: 0,
+      lastCrime: '',
+      player: SB.Player.create(spawn.x, spawn.y),
+      camera: { x: spawn.x, y: spawn.y, zoom: CFG.CAMERA.ZOOM, shake: 0, shakeX: 0, shakeY: 0 },
+      traffic: [], police: [], officers: [], bullets: [], peds: [], targets: [],
+      mission: null,
+      missionIndex: typeof save.missionIndex === 'number' ? U.clamp(save.missionIndex, 0, 6) : 0,
+      completed: save.completed ? save.completed.slice() : [false, false, false, false, false, false, false],
+      notifications: [],
+      banner: null,
       dialog: null,
-      stats: { kills: 0, cars: 0, missions: 0 },
-      effects: SB.effects.create(), camera: SB.camera.create(),
-      objective: 'Welcome to Solara Bay', district: '', street: ''
+      missionPrompt: 0,
+      saveTimer: 0,
+      roadblockTimer: 26,
+      frame: 0,
+      stats: { stolen: 0, shots: 0, distance: 0, jobs: 0 },
+      headlights: false
     };
-    return w;
-  };
-
-  SB.resetWorld = function (w, opts) {
-    const options = opts || {};
-    if (Number.isInteger(options.seed)) {
-      w.seed = options.seed;
-      w.city = SB.createCity(options.seed);
+    for (var i = 0; i < 85; i++) {
+      var rp = CITY.randomRoadPoint(city, rng);
+      var off = CFG.ROAD_W * 0.5 + 10;
+      var px = rp.x + (rp.vertical ? off : 0), py = rp.y + (rp.vertical ? 0 : off);
+      if (!CITY.blocked(city, px, py, 9)) world.peds.push(spawnPed(world, px, py));
     }
-    w.rng = SB.rng(w.seed + Math.floor(w.time * 1000) + 1);
-    w.time = 0;
-    w.clock = options.clock == null ? SB.DAY.start : options.clock;
-    w.money = options.money == null ? 280 : options.money;
-    w.screen = 'play';
-    w.cars.length = 0; w.peds.length = 0; w.cops.length = 0;
-    w.bullets.length = 0; w.pickups.length = 0;
-    w.wanted = 0; w.unseen = 0; w.copTimer = 8; w.arrest = 0;
-    w.lastLoss = 0; // a fresh run has no booking fee left over from the previous one
-    w.lastGunshot = -99; w.lastExplosion = -99;
-    w.effects = SB.effects.create();
-    w.camera = SB.camera.create();
-    w.camera.x = P.respawnX; w.camera.y = P.respawnY;
-    w.stats = { kills: 0, cars: 0, missions: 0 };
-    w.mission = {
-      index: options.missionIndex || 0, stage: 0,
-      target: { x: 600, y: 540 }, car: null, counter: 0, done: false, gap: 0,
-      extra: '', rivals: [], rivalCars: [], boss: null, chaseTime: 0
-    };
-    w.dialog = null;
-    const p = w.player;
-    p.x = P.respawnX; p.y = P.respawnY; p.angle = -Math.PI / 2;
-    p.health = P.maxHealth; p.inCar = null; p.gun = true; p.ammo = P.ammo;
-    p.fire = 0; p.punch = 0; p.muzzle = 0; p.fist = 0; p.hotwire = 0;
-    p.hotwireTarget = null; p.hurt = 0;
-    w.banner.time = 0;
-    SB.spawnInitial(w);
-    SB.missions.begin(w);
-  };
+    return world;
+  }
 
-  SB.respawn = function (w) {
-    const p = w.player;
-    p.inCar = null; p.health = P.maxHealth; p.ammo = Math.max(p.ammo, 18);
-    p.x = P.respawnX; p.y = P.respawnY; p.angle = -Math.PI / 2;
-    p.hotwire = 0; p.hotwireTarget = null; p.hurt = 0;
-    w.wanted = 0; w.unseen = 0; w.arrest = 0; w.copTimer = 10;
-    w.bullets.length = 0;
-    // A clean slate: old gunshot noise must not panic fresh pedestrians on the respawn street.
-    w.lastGunshot = -99; w.lastExplosion = -99;
-    w.camera.x = p.x; w.camera.y = p.y;
-    w.screen = 'play';
-    SB.say(w, 'Back on the street.', 'Watch your step out there.', 3);
-  };
+  function sunLevel(world) {
+    var h = world.clock % 24;
+    var t = (h - 5.5) / 14.0;
+    return U.clamp(Math.sin(t * Math.PI), 0, 1);
+  }
 
-  SB.say = function (w, text, sub, duration) {
-    w.banner.text = text || '';
-    w.banner.sub = sub || '';
-    w.banner.time = duration || 3.4;
-  };
+  function update(world, dt) {
+    world.elapsed += dt;
+    world.clock = (CFG.START_HOUR + world.elapsed / CFG.DAY_LENGTH * 24) % 24;
+    if (world.camera.shake > 0) world.camera.shake = Math.max(0, world.camera.shake - dt * 24);
 
-  SB.downPlayer = function (w, kind) {
-    if (w.screen !== 'play') return;
-    w.screen = kind === 'busted' ? 'busted' : 'wasted';
-    const loss = Math.max(0, Math.floor(w.money * 0.25));
-    w.money -= loss;
-    w.lastLoss = loss;
-    w.wanted = 0;
-    const p = w.player;
-    if (p.inCar) { p.inCar.occupied = false; p.inCar.player = false; p.inCar = null; }
-    p.hotwire = 0;
-    SB.effects.burst(w, p.x, p.y, 'blood', 14);
-  };
-
-  SB.addBullet = function (w, x, y, angle, team, damage, spread) {
-    const a = angle + (spread ? (w.rng() - 0.5) * spread : 0);
-    const speed = team === 'cop' ? 640 : 780;
-    w.bullets.push({ x, y, px: x, py: y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
-      life: 1.35, team, damage: damage || 18 });
-  };
-
-  SB.addPickup = function (w, x, y, kind, value) {
-    if (w.pickups.length >= 40) w.pickups.shift();
-    w.pickups.push({ x, y, kind, value, life: 40, bob: w.rng() * 6 });
-  };
-
-  SB.nearestCar = function (w, x, y, max, filter) {
-    let best = null, bestD = max * max;
-    for (const car of w.cars) {
-      if (filter && !filter(car)) continue;
-      const d = (car.x - x) * (car.x - x) + (car.y - y) * (car.y - y);
-      if (d < bestD) { bestD = d; best = car; }
+    var i, n;
+    for (i = 0; i < world.notifications.length; i++) {
+      world.notifications[i].t += dt;
     }
-    return best;
-  };
-
-  SB.nearestPed = function (w, x, y, max, filter) {
-    let best = null, bestD = max * max;
-    for (const ped of w.peds) {
-      if (!ped.alive || (filter && !filter(ped))) continue;
-      const d = (ped.x - x) * (ped.x - x) + (ped.y - y) * (ped.y - y);
-      if (d < bestD) { bestD = d; best = ped; }
+    world.notifications = world.notifications.filter(function (m) { return m.t < m.life; });
+    if (world.banner) {
+      world.banner.t += dt;
+      if (world.banner.t > world.banner.life) world.banner = null;
     }
-    return best;
-  };
+    if (world.dialog) {
+      world.dialog.t += dt;
+      if (world.dialog.t > world.dialog.life) world.dialog = null;
+    }
 
-  SB.carsNear = function (w, x, y, max) {
-    const list = [];
-    for (const car of w.cars) if (u.dist(car.x, car.y, x, y) < max) list.push(car);
-    return list;
-  };
-
-  SB.pedsNear = function (w, x, y, max) {
-    const list = [];
-    for (const ped of w.peds) if (ped.alive && u.dist(ped.x, ped.y, x, y) < max) list.push(ped);
-    return list;
-  };
-
-  SB.stepBullets = function (w, dt) {
-    const city = w.city;
-    for (let i = w.bullets.length - 1; i >= 0; i -= 1) {
-      const b = w.bullets[i];
-      b.px = b.x; b.py = b.y;
-      b.x += b.vx * dt; b.y += b.vy * dt;
-      b.life -= dt;
-      let done = b.life <= 0 || city.buildingAt(b.x, b.y) !== null ||
-        b.x < W.minX || b.x > W.maxX || b.y < W.minY || b.y > W.maxY;
-      if (!done && b.team === 'player') {
-        for (const ped of w.peds) {
-          if (!ped.alive || u.dist(b.x, b.y, ped.x, ped.y) > 12) continue;
-          SB.hurtPed(w, ped, b.damage, b);
-          done = true; break;
-        }
-        if (!done) for (const car of w.cars) {
-          if (car === w.player.inCar || u.dist(b.x, b.y, car.x, car.y) > 22) continue;
-          SB.damageCar(w, car, b.damage * 0.55, b.x, b.y);
-          done = true; break;
-        }
-      } else if (!done && b.team === 'cop') {
-        const p = w.player;
-        if (p.inCar) {
-          if (u.dist(b.x, b.y, p.inCar.x, p.inCar.y) < 24) {
-            SB.damageCar(w, p.inCar, b.damage * 0.45, b.x, b.y);
-            SB.hurtPlayer(w, b.damage * 0.35, 'shot');
-            done = true;
-          }
-        } else if (u.dist(b.x, b.y, p.x, p.y) < 13) {
-          SB.hurtPlayer(w, b.damage, 'shot');
-          done = true;
-        }
+    // Pedestrians scatter from gunfire and high-speed chases.
+    var p = world.player;
+    for (i = 0; i < world.peds.length; i++) {
+      var ped = world.peds[i];
+      if (U.dist2(ped.x, ped.y, world.camera.x, world.camera.y) > 1700 * 1700) continue;
+      var d = U.dist(ped.x, ped.y, p.x, p.y);
+      if (d < 170 && (world.wanted > 0 || p.shootFlash > 0)) ped.panic = 3.5;
+      if (ped.panic > 0) {
+        ped.panic -= dt;
+        ped.speed = 128;
+      } else ped.speed = U.lerp(ped.speed, 52, dt * 2);
+      if (U.dist2(ped.x, ped.y, ped.wx, ped.wy) < 20 * 20 || world.rng() < dt * 0.05) {
+        newPedWaypoint(world, ped);
       }
-      if (done) {
-        SB.effects.burst(w, b.x, b.y, 'spark', 3);
-        w.bullets.splice(i, 1);
+      var a = Math.atan2(ped.wy - ped.y, ped.wx - ped.x);
+      ped.angle = U.angleLerp(ped.angle, a, Math.min(1, dt * 7));
+      var vx = Math.cos(ped.angle) * ped.speed, vy = Math.sin(ped.angle) * ped.speed;
+      if (!CITY.blocked(world.city, ped.x + vx * dt, ped.y + vy * dt, 8)) {
+        ped.x += vx * dt; ped.y += vy * dt; ped.phase += dt * ped.speed * 0.09;
+      } else newPedWaypoint(world, ped);
+    }
+    // Keep the population from drifting into the sea or inside a mall.
+    for (i = world.peds.length - 1; i >= 0; i--) {
+      if (CITY.blocked(world.city, world.peds[i].x, world.peds[i].y, 5)) world.peds.splice(i, 1);
+    }
+    while (world.peds.length < 70) {
+      var rp = CITY.randomRoadPoint(world.city, world.rng);
+      var off2 = CFG.ROAD_W * 0.5 + 12;
+      var qx = rp.x + (rp.vertical ? off2 : 0), qy = rp.y + (rp.vertical ? 0 : off2);
+      if (!CITY.blocked(world.city, qx, qy, 9)) world.peds.push(spawnPed(world, qx, qy));
+    }
+  }
+
+  // Axis-separated circle collision gives a nice sliding feel against walls.
+  function move(world, ent, dx, dy, r) {
+    var hit = false;
+    if (dx !== 0 && !CITY.blocked(world.city, ent.x + dx, ent.y, r)) ent.x += dx;
+    else if (dx !== 0) hit = true;
+    if (dy !== 0 && !CITY.blocked(world.city, ent.x, ent.y + dy, r)) ent.y += dy;
+    else if (dy !== 0) hit = true;
+    return hit;
+  }
+
+  function clearSpot(world, x, y, r) {
+    if (!CITY.blocked(world.city, x, y, r)) return { x: x, y: y };
+    for (var ring = 1; ring < 14; ring++) {
+      for (var a = 0; a < 12; a++) {
+        var ang = a / 12 * U.TAU;
+        var nx = x + Math.cos(ang) * ring * 34, ny = y + Math.sin(ang) * ring * 34;
+        if (!CITY.blocked(world.city, nx, ny, r)) return { x: nx, y: ny };
       }
     }
-  };
+    return { x: CFG.LANDMARKS.spawn.x, y: CFG.LANDMARKS.spawn.y };
+  }
 
-  SB.stepPickups = function (w, dt) {
-    const p = w.player, px = p.inCar ? p.inCar.x : p.x, py = p.inCar ? p.inCar.y : p.y;
-    for (let i = w.pickups.length - 1; i >= 0; i -= 1) {
-      const item = w.pickups[i];
-      item.life -= dt;
-      if (u.dist(item.x, item.y, px, py) < (p.inCar ? 34 : 23)) {
-        if (item.kind === 'cash') { w.money += item.value; SB.say(w, '+' + u.money(item.value), 'Picked up cash', 1.6); }
-        else if (item.kind === 'health') { p.health = Math.min(P.maxHealth, p.health + item.value); SB.say(w, 'Health restored', '', 1.6); }
-        else { p.ammo += item.value; SB.say(w, '+ ' + item.value + ' rounds', '', 1.6); }
-        SB.effects.burst(w, item.x, item.y, 'spark', 6);
-        w.pickups.splice(i, 1);
-      } else if (item.life <= 0) w.pickups.splice(i, 1);
-    }
-  };
+  function notify(world, text, color, life) {
+    world.notifications.push({ text: text, color: color || CFG.COLORS.hud, t: 0, life: life || 3.2 });
+    if (world.notifications.length > 5) world.notifications.shift();
+  }
 
-  SB.hurtPlayer = function (w, amount, reason) {
-    const p = w.player;
-    if (w.screen !== 'play' || (p.hurt > 0.55 && reason === 'ram')) return;
-    p.health -= amount;
-    p.hurt = 0.2;
-    SB.effects.burst(w, p.x, p.y, 'blood', 4);
-    if (p.health <= 0) SB.downPlayer(w, w.wanted > 0 && reason !== 'explosion' ? 'busted' : 'wasted');
+  function say(world, speaker, text, life) {
+    world.dialog = { speaker: speaker, text: text, t: 0, life: life || 6.5 };
+  }
+
+  function revive(world) {
+    var spot = clearSpot(world, CFG.LANDMARKS.spawn.x, CFG.LANDMARKS.spawn.y, 20);
+    var p = world.player;
+    p.health = CFG.PLAYER.MAX_HEALTH;
+    p.alive = true;
+    p.x = spot.x; p.y = spot.y; p.car = null;
+    p.vx = 0; p.vy = 0;
+    world.wanted = 0; world.heat = 0;
+    world.police.length = 0; world.officers.length = 0;
+    world.state = 'playing';
+    world.camera.x = p.x; world.camera.y = p.y;
+    notify(world, 'You wake up on the boardwalk. Keep your head down.', '#ffd45e', 4.5);
+  }
+
+  SB.World = {
+    create: create, update: update, move: move, sunLevel: sunLevel, clearSpot: clearSpot,
+    notify: notify, say: say, revive: revive, spawnPed: spawnPed
   };
 })(window.SB = window.SB || {});

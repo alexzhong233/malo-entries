@@ -1,30 +1,41 @@
-[
-  {
-    "name": "01-solara-bay-foot.jpg",
-    "mode": "foot",
-    "seed": 7,
-    "waitMs": 4000,
-    "query": "?shot=foot&seed=7"
-  },
-  {
-    "name": "02-drive-traffic.jpg",
-    "mode": "drive",
-    "seed": 11,
-    "waitMs": 4500,
-    "query": "?shot=drive&seed=11"
-  },
-  {
-    "name": "03-police-chase.jpg",
-    "mode": "police",
-    "seed": 23,
-    "waitMs": 7000,
-    "query": "?shot=police&seed=23"
-  },
-  {
-    "name": "04-mission.jpg",
-    "mode": "mission",
-    "seed": 31,
-    "waitMs": 4000,
-    "query": "?shot=mission&seed=31"
-  }
-]
+{
+  "viewport": { "width": 1280, "height": 720 },
+  "quality": 0.86,
+  "maxBytes": 262144,
+  "scenes": [
+    {
+      "file": "01-solara-bay-foot.jpg",
+      "scene": "foot",
+      "settle": 600,
+      "mouse": { "x": 900, "y": 270 },
+      "hold": [{ "keys": ["KeyW"], "ms": 260 }],
+      "click": { "ms": 45 },
+      "after": 90
+    },
+    {
+      "file": "02-drive-traffic.jpg",
+      "scene": "drive",
+      "settle": 450,
+      "mouse": { "x": 980, "y": 340 },
+      "hold": [{ "keys": ["KeyW"], "ms": 1100 }],
+      "after": 120
+    },
+    {
+      "file": "03-police-chase.jpg",
+      "scene": "police",
+      "settle": 500,
+      "mouse": { "x": 780, "y": 230 },
+      "hold": [{ "keys": ["KeyW"], "ms": 900 }],
+      "after": 120
+    },
+    {
+      "file": "04-mission.jpg",
+      "scene": "mission",
+      "settle": 550,
+      "aimAt": "target",
+      "hold": [{ "keys": [], "ms": 120 }],
+      "click": { "ms": 40 },
+      "after": 80
+    }
+  ]
+}

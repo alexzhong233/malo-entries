@@ -1,139 +1,154 @@
-// Front-end screens: title with Start / Continue / Controls, pause menu, controls help, and the
-// BUSTED / WASTED overlays. Screens only report a menu action; main.js applies it.
 (function (SB) {
   'use strict';
-  const F = SB.FIELD, P = SB.PALETTE, u = SB.u;
 
-  const SC = SB.screens = { hit: [], selected: 0, hover: -1, prev: 'start' };
+  var U = SB.U, HUD = SB.HUD;
+  var activeButtons = [];
 
-  function text(ctx, value, x, y, size, color, align, weight) {
-    ctx.font = (weight || '') + ' ' + size + 'px ' + SB.FONT;
-    ctx.fillStyle = color; ctx.textAlign = align || 'center'; ctx.textBaseline = 'alphabetic';
-    ctx.fillText(value, x, y);
-  }
-  function shade(ctx, alpha, color) {
-    ctx.fillStyle = color || 'rgba(8,14,19,' + alpha + ')';
-    ctx.fillRect(0, 0, F.width, F.height);
-  }
-  function items(w) {
-    if (w.screen === 'start') {
-      const list = [{ label: 'START NEW GAME', action: 'new' }];
-      if (SC.hasSave()) list.push({ label: 'CONTINUE', action: 'continue' });
-      list.push({ label: 'CONTROLS', action: 'controls' });
-      return list;
-    }
-    if (w.screen === 'pause') return [
-      { label: 'RESUME', action: 'resume' },
-      { label: 'CONTROLS', action: 'controls' },
-      { label: 'RESTART GAME', action: 'restart' },
-      { label: 'QUIT TO TITLE', action: 'title' }
-    ];
-    return [];
-  }
-  function menu(ctx, w) {
-    const list = items(w);
-    SC.selected = u.clamp(SC.selected, 0, list.length - 1);
-    SC.hit = [];
-    const top = w.screen === 'pause' ? 330 : 388;
-    for (let i = 0; i < list.length; i += 1) {
-      const y = top + i * 54;
-      const box = { x: F.width / 2 - 190, y: y - 32, w: 380, h: 46, action: list[i].action };
-      SC.hit.push(box);
-      const on = i === SC.selected, hovered = i === SC.hover && !on;
-      ctx.fillStyle = on ? 'rgba(255,200,87,0.94)' : hovered ? 'rgba(255,200,87,0.55)' : 'rgba(18,32,39,0.78)';
-      ctx.fillRect(box.x, box.y, box.w, box.h);
-      ctx.strokeStyle = on || hovered ? '#fff0c9' : 'rgba(255,240,210,0.28)';
-      ctx.lineWidth = 1.5; ctx.strokeRect(box.x + 1, box.y + 1, box.w - 2, box.h - 2);
-      text(ctx, list[i].label, F.width / 2, y - 2, 21, on || hovered ? '#1a2529' : P.text, 'center', 'bold');
-    }
+  function setMenu(world, count) {
+    var I = SB.Input;
+    if (I.just('ArrowUp') || I.just('KeyW')) world.menuIndex = (world.menuIndex + count - 1) % count;
+    if (I.just('ArrowDown') || I.just('KeyS')) world.menuIndex = (world.menuIndex + 1) % count;
+    return world.menuIndex;
   }
 
-  SC.hasSave = function () { return SB.save.has(); };
-  SC.clearSave = function () { SB.save.clear(); };
+  function button(ctx, world, label, x, y, w, h, index, disabled, action) {
+    var I = SB.Input;
+    var hover = I.mouse.x >= x && I.mouse.x <= x + w && I.mouse.y >= y && I.mouse.y <= y + h;
+    var selected = world.menuIndex === index || hover;
+    activeButtons.push({ x: x, y: y, w: w, h: h, action: action, disabled: disabled });
+    ctx.fillStyle = disabled ? 'rgba(40,48,58,0.6)' :
+      (selected ? 'rgba(255,212,94,0.94)' : 'rgba(16,26,38,0.82)');
+    U.roundRect(ctx, x, y, w, h, 6); ctx.fill();
+    ctx.strokeStyle = selected ? '#fff3d2' : 'rgba(255,226,160,0.45)';
+    ctx.lineWidth = selected ? 2 : 1;
+    U.roundRect(ctx, x + 0.5, y + 0.5, w - 1, h - 1, 6); ctx.stroke();
+    HUD.text(ctx, label, x + w * 0.5, y + h * 0.5 - 9, 17,
+      disabled ? 'rgba(255,255,255,0.35)' : (selected ? '#1c2430' : '#fff0d0'), 'bold', 'center');
+    if (selected && !disabled && I.just('Enter')) { action(); return true; }
+    return false;
+  }
 
-  SC.update = function (w, input) {
-    const screen = w.screen;
-    SC.hover = -1;
-    if (screen === 'busted' || screen === 'wasted') {
-      if (input.consume('Enter') || input.consume('Space') || input.mouse.click) return 'respawn';
-      return null;
-    }
-    if (screen === 'controls') {
-      if (input.consume('Escape') || input.consume('Enter') || input.consume('KeyC') || input.mouse.click) return 'back';
-      return null;
-    }
-    const list = items(w);
-    // One hit test per frame drives both the hover highlight and the click action.
-    for (let i = 0; i < SC.hit.length; i += 1) {
-      const box = SC.hit[i];
-      if (input.mouse.x >= box.x && input.mouse.x <= box.x + box.w &&
-        input.mouse.y >= box.y && input.mouse.y <= box.y + box.h) { SC.hover = i; break; }
-    }
-    // Consume both bindings even when one already matched, so no press leaks into the next frame.
-    const upArrow = input.consume('ArrowUp'), upKey = input.consume('KeyW');
-    const downArrow = input.consume('ArrowDown'), downKey = input.consume('KeyS');
-    if (upArrow || upKey) SC.selected = (SC.selected + list.length - 1) % list.length;
-    if (downArrow || downKey) SC.selected = (SC.selected + 1) % list.length;
-    if (input.mouse.click && SC.hover >= 0) {
-      SC.selected = SC.hover;
-      return list[SC.hover].action;
-    }
-    if (input.consume('Enter') || input.consume('Space')) return list[SC.selected].action;
-    return null;
-  };
-
-  SC.draw = function (ctx, w) {
-    if (w.screen === 'play') return;
-    SC.hit = [];
-    if (w.screen === 'start') {
-      shade(ctx, 0.42);
-      const g = ctx.createLinearGradient(0, 0, 0, F.height);
-      g.addColorStop(0, 'rgba(14,30,38,0.72)'); g.addColorStop(0.6, 'rgba(12,24,30,0.22)'); g.addColorStop(1, 'rgba(10,18,24,0.75)');
-      ctx.fillStyle = g; ctx.fillRect(0, 0, F.width, F.height);
-      ctx.fillStyle = 'rgba(255,196,92,0.90)';
-      ctx.beginPath(); ctx.arc(F.width - 190, 170, 62, 0, Math.PI * 2); ctx.fill();
-      text(ctx, 'SOLARA BAY', F.width / 2, 216, 96, '#fff3d2', 'center', 'bold');
-      ctx.fillStyle = P.gold; ctx.fillRect(F.width / 2 - 230, 240, 460, 3);
-      text(ctx, 'A SUN-SOAKED OPEN WORLD.  NO RULES AFTER DARK.', F.width / 2, 275, 19, P.text, 'center');
-      menu(ctx, w);
-      text(ctx, '↑↓ choose   ·   ENTER confirm   ·   ESC pause in game', F.width / 2, 620, 15, P.muted, 'center');
-      text(ctx, 'WASD walk & drive  ·  MOUSE aim & shoot  ·  E steal cars', F.width / 2, 650, 14, 'rgba(200,214,208,0.7)', 'center');
-    } else if (w.screen === 'pause') {
-      shade(ctx, 0.66);
-      text(ctx, 'PAUSED', F.width / 2, 240, 70, '#fff3d2', 'center', 'bold');
-      text(ctx, w.city.district(w.player.x, w.player.y) + '  ·  ' + u.money(w.money), F.width / 2, 278, 18, P.gold, 'center');
-      menu(ctx, w);
-      text(ctx, 'The city waits for you.', F.width / 2, 570, 16, P.muted, 'center');
-    } else if (w.screen === 'controls') {
-      shade(ctx, 0.90);
-      text(ctx, 'CONTROLS', F.width / 2, 130, 58, '#fff3d2', 'center', 'bold');
-      const lines = [
-        ['W A S D / ARROWS', 'Walk and drive'],
-        ['MOUSE', 'Aim and shoot (hold for repeat)'],
-        ['RIGHT CLICK / F', 'Fists'],
-        ['G', 'Holster or draw pistol'],
-        ['E (HOLD)', 'Enter and hotwire the nearest car'],
-        ['SPACE', 'Handbrake / drift'],
-        ['SHIFT', 'Sprint on foot'],
-        ['TAB', 'Start / skip the next job'],
-        ['C', 'Show this help again'],
-        ['M', 'Mute audio'],
-        ['ESC', 'Pause']
-      ];
-      for (let i = 0; i < lines.length; i += 1) {
-        const y = 186 + i * 42;
-        text(ctx, lines[i][0], F.width / 2 - 50, y, 19, P.gold, 'right', 'bold');
-        text(ctx, lines[i][1], F.width / 2 + 30, y, 18, P.text, 'left');
+  function handleClicks() {
+    var I = SB.Input;
+    if (!I.mouse.justDown) return;
+    for (var i = 0; i < activeButtons.length; i++) {
+      var b = activeButtons[i];
+      if (b.disabled) continue;
+      if (I.mouse.x >= b.x && I.mouse.x <= b.x + b.w && I.mouse.y >= b.y && I.mouse.y <= b.y + b.h) {
+        b.action(); return;
       }
-      text(ctx, 'ENTER / ESC — back', F.width / 2, 662, 17, P.muted, 'center');
-    } else if (w.screen === 'busted' || w.screen === 'wasted') {
-      const busted = w.screen === 'busted';
-      shade(ctx, 0.74, busted ? 'rgba(12,28,48,0.78)' : 'rgba(48,12,14,0.80)');
-      text(ctx, busted ? 'BUSTED' : 'WASTED', F.width / 2, 302, 96, busted ? '#8fc4ff' : '#ff8b72', 'center', 'bold');
-      text(ctx, busted ? 'The cops booked you.' : 'The street gave you back.', F.width / 2, 348, 22, P.text, 'center');
-      text(ctx, 'BOOKING FEE  −' + u.money(w.lastLoss || 0), F.width / 2, 396, 20, P.gold, 'center', 'bold');
-      text(ctx, 'Cash left  ' + u.money(w.money), F.width / 2, 428, 17, P.muted, 'center');
-      text(ctx, 'PRESS ENTER TO RESPAWN', F.width / 2, 510, 22, '#fff3d2', 'center', 'bold');
     }
-  };
+  }
+
+  function backdrop(ctx, W, H, alpha) {
+    ctx.fillStyle = 'rgba(5,12,22,' + (alpha === undefined ? 0.72 : alpha) + ')';
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function drawTitle(ctx, W, H) {
+    var g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, 'rgba(8,22,42,0.82)');
+    g.addColorStop(0.5, 'rgba(12,32,52,0.5)');
+    g.addColorStop(1, 'rgba(4,10,20,0.92)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    var sunX = W * 0.72, sunY = H * 0.3;
+    var sg = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 240);
+    sg.addColorStop(0, 'rgba(255,214,130,0.4)');
+    sg.addColorStop(1, 'rgba(255,174,90,0)');
+    ctx.fillStyle = sg; ctx.fillRect(sunX - 250, sunY - 250, 500, 500);
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6;
+    HUD.text(ctx, 'SOLARA', W * 0.5, H * 0.17, Math.min(96, W / 11), '#ffd45e', 'bold', 'center');
+    HUD.text(ctx, 'BAY', W * 0.5, H * 0.17 + Math.min(96, W / 11) * 0.78,
+      Math.min(116, W / 9.2), '#fff4dc', 'bold', 'center');
+    ctx.restore();
+    HUD.text(ctx, 'SUN. SPEED. SEVEN SCORES.', W * 0.5, H * 0.47, 16, '#bfe6e4', 'bold', 'center');
+  }
+
+  function start(ctx, world, W, H) {
+    drawTitle(ctx, W, H);
+    activeButtons = [];
+    var sel = setMenu(world, 3);
+    var bx = W * 0.5 - 135, by = H * 0.56;
+    button(ctx, world, 'NEW GAME', bx, by, 270, 44, 0, false, function () { SB.Game.newGame(); });
+    button(ctx, world, 'CONTINUE  ' + (SB.Save.has() ? '' : '(NO SAVE)'), bx, by + 54, 270, 44, 1, !SB.Save.has(), function () { SB.Game.continueGame(); });
+    button(ctx, world, 'CONTROLS', bx, by + 108, 270, 44, 2, false, function () { SB.Game.showControls('start'); });
+    HUD.text(ctx, SB.Save.describe(), W * 0.5, H - 84, 12, 'rgba(255,255,255,0.6)', 'normal', 'center');
+    HUD.text(ctx, 'W / S SELECT     ENTER CONFIRM     CLICK TO CHOOSE', W * 0.5, H - 52,
+      11, 'rgba(255,255,255,0.45)', 'normal', 'center');
+    handleClicks();
+    if (sel !== world.menuIndex && SB.Audio.isReady()) SB.Audio.ui();
+  }
+
+  function controls(ctx, world, W, H) {
+    backdrop(ctx, W, H, 0.85);
+    var pw = Math.min(680, W - 80), ph = 470, x = (W - pw) / 2, y = (H - ph) / 2;
+    HUD.panel(ctx, x, y, pw, ph, 0.88);
+    HUD.text(ctx, 'CONTROLS', x + 32, y + 28, 28, '#ffd45e');
+    var lines = [
+      ['W A S D', 'Walk on foot / accelerate and steer in a car'],
+      ['MOUSE', 'Aim your pistol'],
+      ['LEFT CLICK', 'Fire (drive-by shooting works too)'],
+      ['E', 'Enter / exit the nearest car, interact with a job marker'],
+      ['F', 'Accept a new job when standing on its gold marker'],
+      ['SPACE', 'Handbrake — slide around corners'],
+      ['SHIFT', 'Floor it'],
+      ['TAB', 'Zoom the minimap in and out'],
+      ['C', 'This controls sheet'],
+      ['ESC', 'Pause / resume']
+    ];
+    for (var i = 0; i < lines.length; i++) {
+      var ly = y + 82 + i * 34;
+      HUD.text(ctx, lines[i][0], x + 34, ly, 14, '#8fe4d5');
+      HUD.text(ctx, lines[i][1], x + 184, ly, 14, '#f4efe2', 'normal');
+    }
+    HUD.text(ctx, 'Press C or ESC to go back', x + pw * 0.5, y + ph - 36, 12,
+      'rgba(255,255,255,0.6)', 'normal', 'center');
+    if (SB.Input.just('KeyC') || SB.Input.just('Escape')) SB.Game.closeControls();
+  }
+
+  function pause(ctx, world, W, H) {
+    backdrop(ctx, W, H, 0.66);
+    activeButtons = [];
+    HUD.text(ctx, 'PAUSED', W * 0.5, H * 0.24, 52, '#ffd45e', 'bold', 'center');
+    HUD.text(ctx, 'SOLARA BAY  •  ' + U.cash(world.cash) + '  •  JOB ' +
+      Math.min(7, world.missionIndex + 1) + ' / 7', W * 0.5, H * 0.34, 15, '#dfe9e6', 'normal', 'center');
+    setMenu(world, 3);
+    var bx = W * 0.5 - 130, by = H * 0.44;
+    button(ctx, world, 'RESUME', bx, by, 260, 44, 0, false, function () { SB.Game.resume(); });
+    button(ctx, world, 'SAVE GAME', bx, by + 54, 260, 44, 1, false, function () {
+      SB.Save.write(world); SB.World.notify(world, 'GAME SAVED', '#9cf0c0', 2); SB.Audio.ui();
+    });
+    button(ctx, world, 'CONTROLS', bx, by + 108, 260, 44, 2, false, function () { SB.Game.showControls('pause'); });
+    handleClicks();
+  }
+
+  function gameover(ctx, world, W, H) {
+    backdrop(ctx, W, H, 0.76);
+    activeButtons = [];
+    HUD.text(ctx, 'BUSTED', W * 0.5, H * 0.25, 60, '#ff6b5e', 'bold', 'center');
+    HUD.text(ctx, 'The city always finds you eventually.', W * 0.5, H * 0.36, 15, '#e8e2d6', 'normal', 'center');
+    HUD.text(ctx, 'CARS JACKED ' + world.stats.stolen + '     JOBS DONE ' + world.stats.jobs +
+      '     SHOTS ' + world.stats.shots, W * 0.5, H * 0.43, 13, '#a9c5c4', 'normal', 'center');
+    setMenu(world, 2);
+    var bx = W * 0.5 - 130, by = H * 0.53;
+    button(ctx, world, 'RESPawn at boardwalk'.toUpperCase(), bx, by, 260, 44, 0, false, function () { SB.Game.respawn(); });
+    button(ctx, world, 'NEW GAME', bx, by + 54, 260, 44, 1, false, function () { SB.Game.newGame(); });
+    handleClicks();
+  }
+
+  function draw(ctx, world) {
+    var W = SB.view.w, H = SB.view.h;
+    ctx.save();
+    ctx.setTransform(SB.view.dpr, 0, 0, SB.view.dpr, 0, 0);
+    if (world.state === 'start') start(ctx, world, W, H);
+    else if (world.state === 'controls') controls(ctx, world, W, H);
+    else if (world.state === 'paused') pause(ctx, world, W, H);
+    else if (world.state === 'gameover') gameover(ctx, world, W, H);
+    else activeButtons = [];
+    ctx.restore();
+  }
+
+  SB.Screens = { draw: draw };
 })(window.SB = window.SB || {});
